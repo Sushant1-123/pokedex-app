@@ -32,12 +32,35 @@ class PokemonRepository {
       return (items, true);
     }
 
-    final fresh = await _client.fetchPokemonPage(offset: offset, limit: limit);
+    final details = await _client.fetchPokemonPage(
+      offset: offset,
+      limit: limit,
+    );
+    // The page already downloaded every full record, so cache those too:
+    // opening a card or computing telemetry then needs no extra request.
+    await Future.wait(
+      details.map((d) => _cache.writeDetail(d.name, d.toCacheJson())),
+    );
+    final items = details.map((d) => d.toSummary()).toList();
     await _cache.writeListPage(
       cacheKey,
-      fresh.map((p) => p.toCacheJson()).toList(),
+      items.map((p) => p.toCacheJson()).toList(),
     );
-    return (fresh, false);
+    return (items, false);
+  }
+
+  /// Resolves index matches (name + id only) to cards with types and
+  /// artwork. Each record goes through the detail cache.
+  Future<(List<PokemonSummary> items, bool fromCache)> getPokemonSummaries(
+    List<PokemonIndexEntry> entries,
+  ) async {
+    final details = await Future.wait(
+      entries.map((entry) => getPokemonDetail(entry.name)),
+    );
+    return (
+      details.map((entry) => entry.$1.toSummary()).toList(),
+      details.every((entry) => entry.$2),
+    );
   }
 
   /// Name + id of every Pokemon, used to search beyond the loaded pages.

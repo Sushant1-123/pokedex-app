@@ -1,4 +1,5 @@
 import '../../core/constants.dart';
+import 'pokemon_summary.dart';
 
 /// A single base stat (hp, attack, defense, etc).
 class PokemonStat {
@@ -98,6 +99,9 @@ class PokemonDetail {
       weightKg: (json['weightKg'] as num).toDouble(),
     );
   }
+
+  PokemonSummary toSummary() =>
+      PokemonSummary(id: id, name: name, imageUrl: imageUrl, types: types);
 
   Map<String, dynamic> toCacheJson() => {
     'id': id,

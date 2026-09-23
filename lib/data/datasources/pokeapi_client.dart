@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../core/constants.dart';
-import '../models/pokemon_summary.dart';
 import '../models/pokemon_detail.dart';
 import '../models/pokemon_index_entry.dart';
 
@@ -15,7 +14,7 @@ class PokeApiClient {
   /// full record (needed for types + artwork) via the detail endpoint.
   /// PokeAPI's /pokemon list endpoint doesn't include types or artwork,
   /// so we fetch details in parallel for the requested page.
-  Future<List<PokemonSummary>> fetchPokemonPage({
+  Future<List<PokemonDetail>> fetchPokemonPage({
     required int offset,
     required int limit,
   }) async {
@@ -36,7 +35,7 @@ class PokeApiClient {
       results.map((r) => _fetchDetailJson(r['url'] as String)),
     );
 
-    return details.map(PokemonSummary.fromDetailJson).toList();
+    return details.map(PokemonDetail.fromJson).toList();
   }
 
   /// Fetches the name + id of every Pokemon in one lightweight request, so

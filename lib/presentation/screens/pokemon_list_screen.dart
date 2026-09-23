@@ -97,7 +97,10 @@ class PokemonListScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    PokemonSearchBar(onChanged: notifier.setQuery),
+                    PokemonSearchBar(
+                      query: state.query,
+                      onChanged: notifier.setQuery,
+                    ),
                     const SizedBox(height: 14),
                     _TypeFilters(
                       types: types,

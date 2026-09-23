@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
+import '../../data/models/pokemon_index_entry.dart';
 import '../../data/models/pokemon_summary.dart';
 import 'core_providers.dart';
 
@@ -69,43 +72,81 @@ class PokemonListState {
 
   static const _keepType = Object();
 
-  /// Narrows loaded [items] by the current type and name query.
+  bool get hasQuery => query.trim().isNotEmpty;
+
+  /// Narrows loaded [items] by the selected type.
   List<PokemonSummary> visible(List<PokemonSummary> items) {
-    final byType = selectedType == null
-        ? items
-        : items.where((p) => p.types.contains(selectedType)).toList();
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return byType;
-    return byType.where((p) => p.name.toLowerCase().contains(q)).toList();
+    if (selectedType == null) return items;
+    return items.where((p) => p.types.contains(selectedType)).toList();
   }
+}
+
+/// Case-insensitive name `contains` match over the name index. A numeric
+/// query (optionally prefixed with #) also matches the Pokemon with that id.
+List<PokemonIndexEntry> searchPokemonIndex(
+  List<PokemonIndexEntry> entries,
+  String query,
+) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return entries;
+  final id = int.tryParse(q.startsWith('#') ? q.substring(1) : q);
+  return entries
+      .where((e) => e.name.toLowerCase().contains(q) || e.id == id)
+      .toList();
 }
 
 typedef _Page = ({List<PokemonSummary> items, bool hasMore});
 
 /// Riverpod `NotifierProvider` (as required by the brief) managing the
-/// Pokemon list: paged loading, infinite scroll, refresh and filtering.
+/// Pokemon list: the paginated catalog, debounced search across the full
+/// name index, infinite scroll and refresh.
 class PokemonListNotifier extends Notifier<PokemonListState> {
+  Timer? _debounce;
+
   /// Bumped on every reload; an async result is applied only while its
   /// generation is still current, so a stale response never overwrites a
   /// newer one.
   int _generation = 0;
 
+  /// Index entries matching the active search, or null while browsing the
+  /// catalog page by page.
+  List<PokemonIndexEntry>? _matches;
+
+  /// Last loaded catalog, restored as-is when the search is cleared so the
+  /// paginated list comes back without refetching.
+  ListLoaded? _catalog;
+
   @override
   PokemonListState build() {
+    ref.onDispose(() => _debounce?.cancel());
     // Kick off the initial load right after the first state is produced.
     Future.microtask(_reload);
     return const PokemonListState(status: ListInitialLoading());
   }
 
+  /// Updates the query right away (so the field stays in sync) and searches
+  /// once typing pauses. Clearing it restores the catalog immediately.
   void setQuery(String query) {
+    if (query == state.query) return;
     state = state.copyWith(query: query);
+    _debounce?.cancel();
+    if (state.hasQuery) {
+      _debounce = Timer(AppConstants.searchDebounce, _reload);
+    } else {
+      _reload();
+    }
   }
 
   void setType(String? type) {
     state = state.copyWith(selectedType: type);
   }
 
-  Future<void> refresh() => _reload();
+  /// Drops the cached catalog snapshot and reloads the current view.
+  Future<void> refresh() {
+    _debounce?.cancel();
+    _catalog = null;
+    return _reload();
+  }
 
   /// Appends the next page. No-op unless a loaded list has more to fetch,
   /// so it is safe to call on every scroll event near the bottom.
@@ -117,32 +158,46 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
     try {
       final page = await _fetchPage(status.items.length);
       if (generation != _generation) return;
-      state = state.copyWith(
-        status: ListLoaded([
-          ...status.items,
-          ...page.items,
-        ], hasMore: page.hasMore),
+      _show(
+        ListLoaded([...status.items, ...page.items], hasMore: page.hasMore),
       );
     } catch (e) {
       if (generation != _generation) return;
-      state = state.copyWith(
-        status: ListLoaded(
-          status.items,
-          hasMore: true,
-          loadMoreError: e.toString(),
-        ),
+      _show(
+        ListLoaded(status.items, hasMore: true, loadMoreError: e.toString()),
       );
     }
   }
 
+  /// Loads the first page for the current query. Anything that changes what
+  /// the list shows goes through here, and bumps [_generation].
   Future<void> _reload() async {
     final generation = ++_generation;
+    final query = state.query;
+    final searching = state.hasQuery;
+
+    if (!searching) {
+      _matches = null;
+      final catalog = _catalog;
+      if (catalog != null) {
+        _show(catalog);
+        return;
+      }
+    }
+
     state = state.copyWith(status: const ListInitialLoading());
     try {
+      if (searching) {
+        final (index, _) = await ref
+            .read(pokemonRepositoryProvider)
+            .getPokemonIndex();
+        if (generation != _generation) return;
+        _matches = searchPokemonIndex(index, query);
+      }
       final page = await _fetchPage(0);
       if (generation != _generation) return;
-      state = state.copyWith(
-        status: page.items.isEmpty
+      _show(
+        page.items.isEmpty
             ? const ListEmpty()
             : ListLoaded(page.items, hasMore: page.hasMore),
       );
@@ -152,11 +207,25 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
     }
   }
 
+  /// Next page of either the catalog or the current search matches.
   Future<_Page> _fetchPage(int offset) async {
-    final (items, _) = await ref
-        .read(pokemonRepositoryProvider)
-        .getPokemonPage(offset: offset, limit: AppConstants.pageSize);
-    return (items: items, hasMore: items.length == AppConstants.pageSize);
+    final repository = ref.read(pokemonRepositoryProvider);
+    final matches = _matches;
+    if (matches == null) {
+      final (items, _) = await repository.getPokemonPage(
+        offset: offset,
+        limit: AppConstants.pageSize,
+      );
+      return (items: items, hasMore: items.length == AppConstants.pageSize);
+    }
+    final slice = matches.skip(offset).take(AppConstants.pageSize).toList();
+    final (items, _) = await repository.getPokemonSummaries(slice);
+    return (items: items, hasMore: offset + slice.length < matches.length);
+  }
+
+  void _show(PokemonListStatus status) {
+    if (_matches == null && status is ListLoaded) _catalog = status;
+    state = state.copyWith(status: status);
   }
 }
 

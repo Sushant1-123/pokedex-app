@@ -20,13 +20,17 @@ void main() {
 
   test('model parsers keep cached and API image URLs canonical', () {
     for (final id in ids) {
-      final summary = PokemonSummary.fromDetailJson(_summaryJson(id));
-      expect(summary.imageUrl, pokemonArtworkUrl(id));
-
       final detail = PokemonDetail.fromJson(_detailJson(id));
       expect(detail.imageUrl, pokemonArtworkUrl(id));
       expect(
         PokemonDetail.fromCacheJson(detail.toCacheJson()).imageUrl,
+        pokemonArtworkUrl(id),
+      );
+
+      final summary = detail.toSummary();
+      expect(summary.imageUrl, pokemonArtworkUrl(id));
+      expect(
+        PokemonSummary.fromCacheJson(summary.toCacheJson()).imageUrl,
         pokemonArtworkUrl(id),
       );
     }

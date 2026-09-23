@@ -4,7 +4,6 @@ import '../../core/result.dart';
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../data/models/pokemon_detail.dart';
-import '../../data/models/pokemon_summary.dart';
 import '../providers/pokemon_detail_provider.dart';
 import '../widgets/type_badge.dart';
 import '../widgets/loading_skeleton.dart';
@@ -179,14 +178,7 @@ class _Identity extends StatelessWidget {
               ),
             ),
           ),
-          SavedRecordButton(
-            pokemon: PokemonSummary(
-              id: detail.id,
-              name: detail.name,
-              imageUrl: detail.imageUrl,
-              types: detail.types,
-            ),
-          ),
+          SavedRecordButton(pokemon: detail.toSummary()),
         ],
       ),
       const SizedBox(height: 14),

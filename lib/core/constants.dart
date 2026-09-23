@@ -13,6 +13,9 @@ class AppConstants {
   /// How many Pokemon to request per page from PokeAPI's list endpoint.
   static const int pageSize = 40;
 
+  /// How long typing must pause before a search request is made.
+  static const Duration searchDebounce = Duration(milliseconds: 300);
+
   /// Large enough to return every Pokemon in one request for the name index.
   static const int nameIndexLimit = 100000;
 

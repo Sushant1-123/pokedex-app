@@ -15,28 +15,6 @@ class PokemonSummary {
     required this.types,
   });
 
-  factory PokemonSummary.fromDetailJson(Map<String, dynamic> json) {
-    final id = json['id'] as int;
-    final imageUrl = pokemonArtworkUrl(id);
-
-    final typesJson = json['types'] as List<dynamic>? ?? [];
-    final types = typesJson
-        .map(
-          (t) =>
-              ((t as Map<String, dynamic>)['type']
-                      as Map<String, dynamic>)['name']
-                  as String,
-        )
-        .toList();
-
-    return PokemonSummary(
-      id: id,
-      name: json['name'] as String,
-      imageUrl: imageUrl,
-      types: types,
-    );
-  }
-
   factory PokemonSummary.fromCacheJson(Map<String, dynamic> json) {
     return PokemonSummary(
       id: json['id'] as int,
