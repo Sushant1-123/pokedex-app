@@ -61,7 +61,7 @@ class _TelemetryContent extends StatelessWidget {
                   runSpacing: 12,
                   children: [
                     _Metric(
-                      label: 'LOADED SPECIMENS',
+                      label: 'SAMPLED SPECIMENS',
                       value: '${data.totalSpecimens}',
                     ),
                     _Metric(
@@ -102,7 +102,8 @@ class _TelemetryContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'TELEMETRY IS DERIVED FROM THE CURRENT POKEAPI SPECIMEN INDEX.',
+                  'SAMPLE: THE FIRST ${TelemetryNotifier.sampleSize} SPECIMENS '
+                  'OF THE POKEAPI INDEX (#001 ONWARDS), NOT THE FULL CATALOG.',
                   style: TextStyle(
                     color: AppTheme.muted,
                     fontSize: 10,

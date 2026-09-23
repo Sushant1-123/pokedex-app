@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants.dart';
 import '../../core/result.dart';
 import '../../data/models/pokemon_detail.dart';
 import '../../data/models/pokemon_summary.dart';
 import 'core_providers.dart';
-import 'pokemon_list_provider.dart';
 
 class TelemetryData {
   final int totalSpecimens;
@@ -63,37 +63,26 @@ class TelemetryData {
   }
 }
 
+/// Telemetry is computed from a fixed sample, the first page of the catalog
+/// (#1 onwards), rather than everything the user has scrolled through, so it
+/// never fans out into hundreds of detail requests.
 class TelemetryNotifier extends Notifier<Result<TelemetryData>> {
+  static const sampleSize = AppConstants.pageSize;
+
   @override
   Result<TelemetryData> build() {
-    final listResult = ref.watch(pokemonListProvider).result;
-    switch (listResult) {
-      case Loading():
-        return const Loading();
-      case Failure(message: final message):
-        return Failure(message);
-      case Success(data: final summaries):
-        Future.microtask(() => _load(summaries));
-        return const Loading();
-    }
+    Future.microtask(load);
+    return const Loading();
   }
 
   Future<void> load() async {
-    final result = ref.read(pokemonListProvider).result;
-    switch (result) {
-      case Success<List<PokemonSummary>>(data: final summaries):
-        await _load(summaries);
-      case Failure():
-        await ref.read(pokemonListProvider.notifier).refresh();
-      case Loading():
-        break;
-    }
-  }
-
-  Future<void> _load(List<PokemonSummary> summaries) async {
     state = const Loading();
     try {
       final repository = ref.read(pokemonRepositoryProvider);
+      final (summaries, pageFromCache) = await repository.getPokemonPage(
+        offset: 0,
+        limit: sampleSize,
+      );
       final details = await Future.wait(
         summaries.map((summary) => repository.getPokemonDetail(summary.name)),
       );
@@ -102,7 +91,7 @@ class TelemetryNotifier extends Notifier<Result<TelemetryData>> {
           summaries,
           details.map((entry) => entry.$1).toList(),
         ),
-        fromCache: details.every((entry) => entry.$2),
+        fromCache: pageFromCache && details.every((entry) => entry.$2),
       );
     } catch (error) {
       state = Failure(error.toString());

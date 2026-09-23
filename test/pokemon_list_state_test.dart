@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokedex_app/core/result.dart';
 import 'package:pokedex_app/data/models/pokemon_summary.dart';
 import 'package:pokedex_app/presentation/providers/pokemon_list_provider.dart';
 
@@ -20,24 +19,27 @@ void main() {
   ];
 
   test('filters summaries by name', () {
-    const state = PokemonListState(result: Success(items), query: 'saur');
+    const state = PokemonListState(status: ListInitialLoading(), query: 'saur');
 
-    expect(state.filtered.map((pokemon) => pokemon.name), ['bulbasaur']);
+    expect(state.visible(items).map((pokemon) => pokemon.name), ['bulbasaur']);
   });
 
   test('filters summaries by type and query together', () {
     const state = PokemonListState(
-      result: Success(items),
+      status: ListInitialLoading(),
       query: 'char',
       selectedType: 'fire',
     );
 
-    expect(state.filtered.map((pokemon) => pokemon.name), ['charmander']);
+    expect(state.visible(items).map((pokemon) => pokemon.name), ['charmander']);
   });
 
   test('returns no summaries for an unmatched query', () {
-    const state = PokemonListState(result: Success(items), query: 'missing');
+    const state = PokemonListState(
+      status: ListInitialLoading(),
+      query: 'missing',
+    );
 
-    expect(state.filtered, isEmpty);
+    expect(state.visible(items), isEmpty);
   });
 }

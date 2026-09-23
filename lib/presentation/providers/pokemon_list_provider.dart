@@ -1,30 +1,65 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
-import '../../core/result.dart';
 import '../../data/models/pokemon_summary.dart';
 import 'core_providers.dart';
 
-/// Full state for the list screen: the loaded page, the current search query,
-/// and the derived filtered list. Kept as one immutable class so the Notifier
-/// has a single source of truth to update via `state = state.copyWith(...)`.
+/// What the list area shows. Sealed so the screen's `switch` has to handle
+/// every case: initial loading, failure, empty results, loaded, loading more.
+sealed class PokemonListStatus {
+  const PokemonListStatus();
+}
+
+/// The first page is loading; the screen shows skeletons.
+final class ListInitialLoading extends PokemonListStatus {
+  const ListInitialLoading();
+}
+
+/// The first page failed, so there is nothing to show but a retry.
+final class ListFailure extends PokemonListStatus {
+  final String message;
+  const ListFailure(this.message);
+}
+
+/// Nothing matches the current query / type filter.
+final class ListEmpty extends PokemonListStatus {
+  const ListEmpty();
+}
+
+/// Items are on screen. [loadMoreError] is set when the last next-page
+/// request failed, so the footer can offer a retry.
+final class ListLoaded extends PokemonListStatus {
+  final List<PokemonSummary> items;
+  final bool hasMore;
+  final String? loadMoreError;
+  const ListLoaded(this.items, {required this.hasMore, this.loadMoreError});
+}
+
+/// Items are on screen and the next page is being fetched.
+final class ListLoadingMore extends PokemonListStatus {
+  final List<PokemonSummary> items;
+  const ListLoadingMore(this.items);
+}
+
+/// Full state for the list screen, kept as one immutable class so the
+/// Notifier has a single source of truth to update via `copyWith`.
 class PokemonListState {
-  final Result<List<PokemonSummary>> result;
+  final PokemonListStatus status;
   final String query;
   final String? selectedType;
 
   const PokemonListState({
-    required this.result,
+    required this.status,
     this.query = '',
     this.selectedType,
   });
 
   PokemonListState copyWith({
-    Result<List<PokemonSummary>>? result,
+    PokemonListStatus? status,
     String? query,
     Object? selectedType = _keepType,
   }) {
     return PokemonListState(
-      result: result ?? this.result,
+      status: status ?? this.status,
       query: query ?? this.query,
       selectedType: identical(selectedType, _keepType)
           ? this.selectedType
@@ -34,43 +69,32 @@ class PokemonListState {
 
   static const _keepType = Object();
 
-  /// Real-time filter by name — case-insensitive substring match.
-  List<PokemonSummary> get filtered {
-    final all = switch (result) {
-      Success<List<PokemonSummary>>(data: final d) => d,
-      _ => const <PokemonSummary>[],
-    };
+  /// Narrows loaded [items] by the current type and name query.
+  List<PokemonSummary> visible(List<PokemonSummary> items) {
     final byType = selectedType == null
-        ? all
-        : all.where((p) => p.types.contains(selectedType)).toList();
-    if (query.trim().isEmpty) return byType;
+        ? items
+        : items.where((p) => p.types.contains(selectedType)).toList();
     final q = query.trim().toLowerCase();
+    if (q.isEmpty) return byType;
     return byType.where((p) => p.name.toLowerCase().contains(q)).toList();
   }
 }
 
+typedef _Page = ({List<PokemonSummary> items, bool hasMore});
+
 /// Riverpod `NotifierProvider` (as required by the brief) managing the
-/// Pokemon list: initial load, pull-to-refresh, and search filtering.
+/// Pokemon list: paged loading, infinite scroll, refresh and filtering.
 class PokemonListNotifier extends Notifier<PokemonListState> {
+  /// Bumped on every reload; an async result is applied only while its
+  /// generation is still current, so a stale response never overwrites a
+  /// newer one.
+  int _generation = 0;
+
   @override
   PokemonListState build() {
     // Kick off the initial load right after the first state is produced.
-    Future.microtask(load);
-    return const PokemonListState(result: Loading());
-  }
-
-  Future<void> load() async {
-    state = state.copyWith(result: const Loading());
-    try {
-      final repo = ref.read(pokemonRepositoryProvider);
-      final (items, fromCache) = await repo.getPokemonPage(
-        offset: 0,
-        limit: AppConstants.pageSize,
-      );
-      state = state.copyWith(result: Success(items, fromCache: fromCache));
-    } catch (e) {
-      state = state.copyWith(result: Failure(e.toString()));
-    }
+    Future.microtask(_reload);
+    return const PokemonListState(status: ListInitialLoading());
   }
 
   void setQuery(String query) {
@@ -81,7 +105,59 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
     state = state.copyWith(selectedType: type);
   }
 
-  Future<void> refresh() => load();
+  Future<void> refresh() => _reload();
+
+  /// Appends the next page. No-op unless a loaded list has more to fetch,
+  /// so it is safe to call on every scroll event near the bottom.
+  Future<void> loadMore() async {
+    final status = state.status;
+    if (status is! ListLoaded || !status.hasMore) return;
+    final generation = _generation;
+    state = state.copyWith(status: ListLoadingMore(status.items));
+    try {
+      final page = await _fetchPage(status.items.length);
+      if (generation != _generation) return;
+      state = state.copyWith(
+        status: ListLoaded([
+          ...status.items,
+          ...page.items,
+        ], hasMore: page.hasMore),
+      );
+    } catch (e) {
+      if (generation != _generation) return;
+      state = state.copyWith(
+        status: ListLoaded(
+          status.items,
+          hasMore: true,
+          loadMoreError: e.toString(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _reload() async {
+    final generation = ++_generation;
+    state = state.copyWith(status: const ListInitialLoading());
+    try {
+      final page = await _fetchPage(0);
+      if (generation != _generation) return;
+      state = state.copyWith(
+        status: page.items.isEmpty
+            ? const ListEmpty()
+            : ListLoaded(page.items, hasMore: page.hasMore),
+      );
+    } catch (e) {
+      if (generation != _generation) return;
+      state = state.copyWith(status: ListFailure(e.toString()));
+    }
+  }
+
+  Future<_Page> _fetchPage(int offset) async {
+    final (items, _) = await ref
+        .read(pokemonRepositoryProvider)
+        .getPokemonPage(offset: offset, limit: AppConstants.pageSize);
+    return (items: items, hasMore: items.length == AppConstants.pageSize);
+  }
 }
 
 final pokemonListProvider =
