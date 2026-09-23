@@ -12,13 +12,7 @@ class SavedRecordsNotifier extends Notifier<Result<List<PokemonSummary>>> {
 
   void load() {
     try {
-      final records =
-          ref
-              .read(pokemonCacheProvider)
-              .readSavedRecords()
-              .map(PokemonSummary.fromCacheJson)
-              .toList()
-            ..sort((a, b) => a.id.compareTo(b.id));
+      final records = ref.read(pokemonRepositoryProvider).getSavedRecords();
       state = Success(records, fromCache: true);
     } catch (error) {
       state = Failure(error.toString());
@@ -26,22 +20,13 @@ class SavedRecordsNotifier extends Notifier<Result<List<PokemonSummary>>> {
   }
 
   Future<void> toggle(PokemonSummary pokemon) async {
-    final cache = ref.read(pokemonCacheProvider);
-    final current = switch (state) {
-      Success<List<PokemonSummary>>(data: final records) => records,
-      _ => cache.readSavedRecords().map(PokemonSummary.fromCacheJson).toList(),
-    };
-    final exists = current.any((record) => record.id == pokemon.id);
-    if (exists) {
-      await cache.deleteSavedRecord(pokemon.id);
+    final repository = ref.read(pokemonRepositoryProvider);
+    final saved = repository.getSavedRecords().any((r) => r.id == pokemon.id);
+    if (saved) {
+      await repository.deleteSavedRecord(pokemon.id);
     } else {
-      await cache.writeSavedRecord(pokemon.toCacheJson());
+      await repository.saveRecord(pokemon);
     }
-    load();
-  }
-
-  Future<void> remove(PokemonSummary pokemon) async {
-    await ref.read(pokemonCacheProvider).deleteSavedRecord(pokemon.id);
     load();
   }
 }

@@ -102,7 +102,7 @@ void main() {
       second.read(savedRecordsProvider.notifier).load();
       expect(_saved(second).map((record) => record.id), [pokemon.id]);
 
-      await second.read(savedRecordsProvider.notifier).remove(pokemon);
+      await second.read(savedRecordsProvider.notifier).toggle(pokemon);
       expect(_saved(second), isEmpty);
     },
   );

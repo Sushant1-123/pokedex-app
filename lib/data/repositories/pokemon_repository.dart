@@ -86,6 +86,17 @@ class PokemonRepository {
     return (fresh, false);
   }
 
+  /// Bookmarked Pokemon, sorted by id. Stored without a TTL: these are the
+  /// user's own records, not cached API responses.
+  List<PokemonSummary> getSavedRecords() =>
+      _cache.readSavedRecords().map(PokemonSummary.fromCacheJson).toList()
+        ..sort((a, b) => a.id.compareTo(b.id));
+
+  Future<void> saveRecord(PokemonSummary pokemon) =>
+      _cache.writeSavedRecord(pokemon.toCacheJson());
+
+  Future<void> deleteSavedRecord(int id) => _cache.deleteSavedRecord(id);
+
   Future<(List<PokemonIndexEntry> entries, bool fromCache)> _getIndex(
     String key,
     Future<List<PokemonIndexEntry>> Function() fetch,
