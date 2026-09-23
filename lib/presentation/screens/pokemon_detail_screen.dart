@@ -1,109 +1,146 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/result.dart';
 import '../../core/constants.dart';
+import '../../core/design_tokens.dart';
+import '../../core/result.dart';
 import '../../core/theme.dart';
-import '../../data/models/pokemon_detail.dart';
+import '../../data/models/pokemon_index_entry.dart';
+import '../providers/app_navigation_provider.dart';
 import '../providers/pokemon_detail_provider.dart';
-import '../widgets/type_badge.dart';
-import '../widgets/loading_skeleton.dart';
+import '../providers/section_providers.dart';
+import '../widgets/detail/detail_sections.dart';
+import '../widgets/detail/specimen_viewport.dart';
 import '../widgets/error_view.dart';
-import '../widgets/stat_bar.dart';
-import '../widgets/pokemon_image.dart';
-import '../widgets/saved_record_button.dart';
+import '../widgets/field_shell.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/panel.dart';
+import '../widgets/pokemon_card.dart';
 
+/// Specimen telemetry for one Pokemon: stacked on mobile, two columns
+/// (flex 5 / 7) on tablet and desktop, as in the Stitch frames.
 class PokemonDetailScreen extends ConsumerWidget {
-  final String nameOrId;
+  final int pokemonId;
   final String? heroTag;
-  const PokemonDetailScreen({super.key, required this.nameOrId, this.heroTag});
+
+  /// Artwork already known from the card, so the Hero lands on a real image
+  /// while the record loads.
+  final String? initialImageUrl;
+
+  const PokemonDetailScreen({
+    super.key,
+    required this.pokemonId,
+    this.heroTag,
+    this.initialImageUrl,
+  });
+
+  void _open(BuildContext context, int id) =>
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => PokemonDetailScreen(pokemonId: id)),
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final result = ref.watch(pokemonDetailProvider(nameOrId));
+    final provider = pokemonDetailProvider(pokemonId);
+    final result = ref.watch(provider);
+    final retry = ref.read(provider.notifier).load;
+    final wide = MediaQuery.sizeOf(context).width >= Breakpoints.tablet;
+    final padding = Breakpoints.pagePaddingFor(
+      MediaQuery.sizeOf(context).width,
+    );
 
-    return Scaffold(
-      body: SafeArea(
+    final neighbours = switch (result) {
+      Success(:final data) => data.neighbours,
+      _ => (previous: null, next: null),
+    };
+    final breadcrumbs = _Breadcrumbs(
+      pokemonId: pokemonId,
+      name: switch (result) {
+        Success(:final data) => data.detail.name,
+        _ => null,
+      },
+      neighbours: neighbours,
+      onOpen: (id) => _open(context, id),
+    );
+
+    final body = switch (result) {
+      Failure(:final message) => ErrorView(
+        title: 'Specimen Sector Checksum Mismatch',
+        message: message,
+        onRetry: retry,
+      ),
+      // Same slots as the loaded layout, so the viewport (and its Hero and
+      // entrance animation) keeps its state when the record arrives.
+      Loading() => _Layout(
+        wide: wide,
+        left: [
+          const Panel(child: SectionSkeleton()),
+          SpecimenViewport(
+            pokemonId: pokemonId,
+            heroTag: heroTag,
+            imageUrl: initialImageUrl ?? pokemonArtworkUrl(pokemonId),
+            glow: AppColors.cyan,
+          ),
+          const Panel(child: SectionSkeleton(lines: 2)),
+        ],
+        right: const [
+          Panel(child: SectionSkeleton(lines: 6)),
+          Panel(child: SectionSkeleton(lines: 2)),
+        ],
+      ),
+      Success(:final data) => _Layout(
+        wide: wide,
+        left: [
+          IdentityPanel(detail: data.detail, species: data.species),
+          SpecimenViewport(
+            pokemonId: pokemonId,
+            heroTag: heroTag,
+            imageUrl: data.detail.imageUrl,
+            animatedSpriteUrl: data.detail.animatedSpriteUrl,
+            cryUrl: data.detail.cryUrl,
+            glow: pokemonGlowColor(switch (data.species) {
+              Success(:final data) => data.color,
+              _ => null,
+            }, data.detail.types),
+          ),
+          PhysicalMetricsPanel(
+            detail: data.detail,
+            species: data.species,
+            onRetry: retry,
+          ),
+          if (wide)
+            EvolutionPanel(
+              evolution: data.evolution,
+              currentSpeciesId: data.detail.speciesId,
+              onOpen: (id) => _open(context, id),
+              onRetry: retry,
+            ),
+        ],
+        right: [
+          BaseStatsPanel(detail: data.detail),
+          AbilitiesPanel(detail: data.detail),
+          DefensesPanel(defenses: data.defenses, onRetry: retry),
+          if (!wide)
+            EvolutionPanel(
+              evolution: data.evolution,
+              currentSpeciesId: data.detail.speciesId,
+              onOpen: (id) => _open(context, id),
+              onRetry: retry,
+            ),
+          FieldNotesPanel(species: data.species, onRetry: retry),
+        ],
+      ),
+    };
+
+    return FieldShell(
+      active: AppDestination.specimenIndex,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(padding),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              height: 66,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppTheme.line)),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppTheme.muted,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'SPECIMEN TELEMETRY',
-                    style: TextStyle(
-                      color: AppTheme.paper,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    'RECORD / ${nameOrId.toUpperCase()}',
-                    style: const TextStyle(
-                      color: AppTheme.signal,
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: switch (result) {
-                Loading() => const PokemonDetailSkeleton(),
-                Failure(message: final msg) => ErrorView(
-                  message: msg,
-                  onRetry: () =>
-                      ref.read(pokemonDetailProvider(nameOrId).notifier).load(),
-                ),
-                Success(data: final detail) => LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= Breakpoints.tablet;
-                    final accent = detail.types.isNotEmpty
-                        ? colorForType(detail.types.first)
-                        : AppTheme.signal;
-                    final identity = _Identity(
-                      detail: detail,
-                      heroTag: heroTag,
-                      accent: accent,
-                    );
-                    final readings = _Readings(detail: detail, accent: accent);
-                    return SingleChildScrollView(
-                      padding: EdgeInsets.all(wide ? 32 : 18),
-                      child: wide
-                          ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(child: identity),
-                                const SizedBox(width: 24),
-                                Expanded(child: readings),
-                              ],
-                            )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                identity,
-                                const SizedBox(height: 28),
-                                readings,
-                              ],
-                            ),
-                    );
-                  },
-                ),
-              },
-            ),
+            breadcrumbs,
+            const SizedBox(height: AppSpacing.xl),
+            body,
           ],
         ),
       ),
@@ -111,205 +148,178 @@ class PokemonDetailScreen extends ConsumerWidget {
   }
 }
 
-class _Identity extends StatelessWidget {
-  final PokemonDetail detail;
-  final String? heroTag;
-  final Color accent;
-  const _Identity({
-    required this.detail,
-    required this.heroTag,
-    required this.accent,
-  });
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+class _Layout extends StatelessWidget {
+  final bool wide;
+  final List<Widget> left;
+  final List<Widget> right;
+
+  const _Layout({required this.wide, required this.left, required this.right});
+
+  static Widget _column(List<Widget> children) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Container(
-        height: 330,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: AppTheme.panel,
-          border: Border.all(color: AppTheme.line),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Stack(
+      for (var i = 0; i < children.length; i++) ...[
+        if (i > 0) const SizedBox(height: AppSpacing.xxl),
+        children[i],
+      ],
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) => wide
+      ? Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Positioned(
-              top: 16,
-              left: 16,
-              child: Text(
-                'VISUAL ARCHIVE / 01',
-                style: TextStyle(color: accent, fontSize: 10, letterSpacing: 1),
+            Expanded(flex: 5, child: _column(left)),
+            const SizedBox(width: AppSpacing.xxl),
+            Expanded(flex: 7, child: _column(right)),
+          ],
+        )
+      : _column([...left, ...right]);
+}
+
+/// Back button, "DIRECTORY / #0006 CHARIZARD" and prev/next specimens.
+class _Breadcrumbs extends StatelessWidget {
+  final int pokemonId;
+  final String? name;
+  final DexNeighbours neighbours;
+  final ValueChanged<int> onOpen;
+
+  const _Breadcrumbs({
+    required this.pokemonId,
+    required this.name,
+    required this.neighbours,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) => Panel(
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpacing.md,
+      vertical: AppSpacing.sm,
+    ),
+    child: Wrap(
+      spacing: AppSpacing.md,
+      runSpacing: AppSpacing.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      alignment: WrapAlignment.spaceBetween,
+      children: [
+        Wrap(
+          spacing: AppSpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).maybePop(),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textPrimary,
               ),
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              label: const Text('Back to Directory'),
             ),
-            Center(
-              child: Hero(
-                tag: heroTag ?? 'pokemon-image-${detail.id}',
-                child: PokemonImage(
-                  pokemonId: detail.id,
-                  accent: accent,
-                  height: 260,
-                  fit: BoxFit.contain,
-                ),
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: 'DIRECTORY / '),
+                  TextSpan(
+                    text: [
+                      dexNumber(pokemonId),
+                      if (name case final String name) name.toUpperCase(),
+                    ].join(' '),
+                    style: const TextStyle(color: AppColors.cyan),
+                  ),
+                ],
               ),
+              style: AppTypography.caption,
             ),
           ],
         ),
-      ),
-      const SizedBox(height: 24),
-      Text(
-        '#${detail.id.toString().padLeft(3, '0')}',
-        style: TextStyle(
-          color: accent,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      const SizedBox(height: 6),
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              _titleCase(detail.name),
-              style: const TextStyle(
-                color: AppTheme.paper,
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            if (neighbours.previous case final PokemonIndexEntry previous)
+              _NeighbourLink(
+                entry: previous,
+                forward: false,
+                onTap: () => onOpen(previous.id),
               ),
-            ),
-          ),
-          SavedRecordButton(pokemon: detail.toSummary()),
-        ],
-      ),
-      const SizedBox(height: 14),
-      Wrap(
-        spacing: 8,
-        children: [
-          for (var i = 0; i < detail.types.length; i++)
-            TypeBadge(type: detail.types[i], index: i),
-        ],
-      ),
-    ],
-  );
-}
-
-class _Readings extends StatelessWidget {
-  final PokemonDetail detail;
-  final Color accent;
-  const _Readings({required this.detail, required this.accent});
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const _SectionLabel(label: 'PHYSICAL READINGS'),
-      const SizedBox(height: 10),
-      Row(
-        children: [
-          _MetricChip(label: 'HEIGHT', value: '${detail.heightM} m'),
-          const SizedBox(width: 10),
-          _MetricChip(label: 'WEIGHT', value: '${detail.weightKg} kg'),
-        ],
-      ),
-      const SizedBox(height: 28),
-      const _SectionLabel(label: 'BASE STAT TELEMETRY'),
-      const SizedBox(height: 10),
-      ...detail.stats.map(
-        (stat) => StatBar(
-          label: stat.name.replaceAll('-', ' '),
-          value: stat.base,
-          color: accent,
-        ),
-      ),
-      const SizedBox(height: 24),
-      const _SectionLabel(label: 'KNOWN ABILITIES'),
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: detail.abilities
-            .map(
-              (ability) => Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.panelRaised,
-                  border: Border.all(color: AppTheme.line),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  _titleCase(ability.replaceAll('-', ' ')),
-                  style: const TextStyle(color: AppTheme.paper, fontSize: 11),
-                ),
+            if (neighbours.next case final PokemonIndexEntry next)
+              _NeighbourLink(
+                entry: next,
+                forward: true,
+                onTap: () => onOpen(next.id),
               ),
-            )
-            .toList(),
-      ),
-    ],
-  );
-}
-
-String _titleCase(String value) =>
-    value.isEmpty ? value : value[0].toUpperCase() + value.substring(1);
-
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  const _SectionLabel({required this.label});
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(width: 5, height: 5, color: AppTheme.signal),
-      const SizedBox(width: 8),
-      Text(
-        label,
-        style: const TextStyle(
-          color: AppTheme.muted,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.5,
+            const _CompareButton(),
+          ],
         ),
-      ),
-    ],
+      ],
+    ),
   );
 }
 
-class _MetricChip extends StatelessWidget {
-  final String label;
-  final String value;
-  const _MetricChip({required this.label, required this.value});
+class _NeighbourLink extends StatelessWidget {
+  final PokemonIndexEntry entry;
+  final bool forward;
+  final VoidCallback onTap;
+
+  const _NeighbourLink({
+    required this.entry,
+    required this.forward,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: const BoxDecoration(
-          color: AppTheme.panelRaised,
-          border: Border.fromBorderSide(BorderSide(color: AppTheme.line)),
-          borderRadius: BorderRadius.all(Radius.circular(3)),
+    final label = Text(
+      '${dexNumber(entry.id)} ${titleCase(entry.name)}',
+      style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+    );
+    final icon = Icon(
+      forward ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
+      size: 16,
+      color: AppColors.textSecondary,
+    );
+    return Tooltip(
+      message: forward ? 'Next specimen' : 'Previous specimen',
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: AppColors.border),
+          backgroundColor: AppColors.surface,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+          ),
         ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-                color: AppTheme.paper,
-              ),
-            ),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 10,
-                color: AppTheme.muted,
-                letterSpacing: 1,
-              ),
-            ),
-          ],
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: forward ? [label, icon] : [icon, label],
         ),
       ),
+    );
+  }
+}
+
+/// Adds this Pokemon to Compare Lab and opens it.
+class _CompareButton extends ConsumerWidget {
+  const _CompareButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final screen = context
+        .findAncestorWidgetOfExactType<PokemonDetailScreen>()!;
+    return FilledButton.icon(
+      onPressed: () {
+        ref.read(compareProvider.notifier).add(screen.pokemonId);
+        navigateToDestination(context, ref, AppDestination.compare);
+      },
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.crimson,
+        foregroundColor: AppColors.textPrimary,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      ),
+      icon: const Icon(Icons.compare_arrows_rounded, size: 18),
+      label: const Text('Compare'),
     );
   }
 }

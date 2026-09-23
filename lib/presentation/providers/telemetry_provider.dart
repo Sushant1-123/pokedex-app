@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../core/result.dart';
+import '../../data/models/fetch_source.dart';
 import '../../data/models/pokemon_detail.dart';
-import '../../data/models/pokemon_summary.dart';
 import 'core_providers.dart';
 
 class TelemetryData {
@@ -20,13 +20,10 @@ class TelemetryData {
     required this.averageBaseStats,
   });
 
-  static TelemetryData fromDetails(
-    List<PokemonSummary> summaries,
-    List<PokemonDetail> details,
-  ) {
+  static TelemetryData fromDetails(List<PokemonDetail> details) {
     final typeCounts = <String, int>{};
-    for (final summary in summaries) {
-      for (final type in summary.types) {
+    for (final detail in details) {
+      for (final type in detail.types) {
         typeCounts[type] = (typeCounts[type] ?? 0) + 1;
       }
     }
@@ -54,7 +51,7 @@ class TelemetryData {
     }
 
     return TelemetryData(
-      totalSpecimens: summaries.length,
+      totalSpecimens: details.length,
       typeCounts: typeCounts,
       averageHeightM: averageHeight,
       averageWeightKg: averageWeight,
@@ -79,19 +76,18 @@ class TelemetryNotifier extends Notifier<Result<TelemetryData>> {
     state = const Loading();
     try {
       final repository = ref.read(pokemonRepositoryProvider);
-      final (summaries, pageFromCache) = await repository.getPokemonPage(
-        offset: 0,
-        limit: sampleSize,
-      );
+      final (index, indexSource) = await repository.getPokemonIndex();
+      final sample = index.where((e) => e.isBaseSpecies).take(sampleSize);
       final details = await Future.wait(
-        summaries.map((summary) => repository.getPokemonDetail(summary.name)),
+        sample.map((entry) => repository.getPokemonDetail(entry.id)),
       );
+      final source = FetchSource.combine([
+        indexSource,
+        for (final (_, source) in details) source,
+      ]);
       state = Success(
-        TelemetryData.fromDetails(
-          summaries,
-          details.map((entry) => entry.$1).toList(),
-        ),
-        fromCache: pageFromCache && details.every((entry) => entry.$2),
+        TelemetryData.fromDetails([for (final (detail, _) in details) detail]),
+        fromCache: source is CacheHit,
       );
     } catch (error) {
       state = Failure(error.toString());

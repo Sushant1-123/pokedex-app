@@ -1,307 +1,464 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
+import '../../core/design_tokens.dart';
 import '../../core/theme.dart';
 import '../../data/models/pokemon_summary.dart';
-import '../providers/pokemon_list_provider.dart';
-import '../widgets/pokemon_card.dart';
-import '../widgets/loading_skeleton.dart';
-import '../widgets/error_view.dart';
-import '../widgets/search_bar.dart';
-import '../widgets/field_shell.dart';
 import '../providers/app_navigation_provider.dart';
+import '../providers/pokemon_list_provider.dart';
+import '../widgets/error_view.dart';
+import '../widgets/field_shell.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/pagination_bar.dart';
+import '../widgets/panel.dart';
+import '../widgets/pokemon_card.dart';
+import '../widgets/search_bar.dart';
+import '../widgets/status_readouts.dart';
 import 'pokemon_detail_screen.dart';
 
-/// Start fetching the next page when the user is this close to the bottom.
-const double _loadMoreThreshold = 600;
-
-class PokemonListScreen extends ConsumerWidget {
+class PokemonListScreen extends ConsumerStatefulWidget {
   const PokemonListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PokemonListScreen> createState() => _PokemonListScreenState();
+}
+
+class _PokemonListScreenState extends ConsumerState<PokemonListScreen> {
+  final _scroll = ScrollController();
+  final _searchFocus = FocusNode(debugLabel: 'search');
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  void _openDetail(PokemonSummary pokemon) => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => PokemonDetailScreen(
+        pokemonId: pokemon.id,
+        heroTag: 'pokemon-image-${pokemon.id}',
+        initialImageUrl: pokemon.imageUrl,
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(pokemonListProvider.select((s) => s.status), (previous, next) {
+      final moved = switch ((previous, next)) {
+        (ListPaged(page: final a), ListPaged(page: final b)) => a != b,
+        _ => false,
+      };
+      if (moved && _scroll.hasClients) {
+        _scroll.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
     final state = ref.watch(pokemonListProvider);
     final notifier = ref.read(pokemonListProvider.notifier);
     final status = state.status;
-    final width = MediaQuery.of(context).size.width;
-    final columns = Breakpoints.columnsFor(width);
-
-    final isDesktop = width >= Breakpoints.desktop;
-    final cardAspectRatio = width >= Breakpoints.desktop
-        ? 0.94
-        : width >= Breakpoints.tablet
-        ? 0.88
-        : 0.82;
-    final types = pokemonTypeColors.keys.toList()..sort();
-
-    // A failed page waits for an explicit retry instead of auto-retrying.
-    final canLoadMore = switch (status) {
-      ListLoaded(hasMore: true, loadMoreError: null) => true,
-      _ => false,
-    };
-
-    // Covers both user scrolling and content growth (a page that doesn't
-    // fill the viewport yet), so short pages keep loading until it does.
-    bool onScroll(Notification notification) {
-      final metrics = switch (notification) {
-        ScrollNotification(:final metrics) => metrics,
-        ScrollMetricsNotification(:final metrics) => metrics,
-        _ => null,
-      };
-      if (canLoadMore &&
-          metrics != null &&
-          metrics.axis == Axis.vertical &&
-          metrics.extentAfter < _loadMoreThreshold) {
-        Future.microtask(notifier.loadMore);
-      }
-      return false;
-    }
+    final width = MediaQuery.sizeOf(context).width;
+    final isWide = width >= Breakpoints.tablet;
+    final padding = Breakpoints.pagePaddingFor(width);
 
     return FieldShell(
       active: AppDestination.specimenIndex,
       onRefresh: notifier.refresh,
-      child: NotificationListener<Notification>(
-        onNotification: onScroll,
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                isDesktop ? 32 : 18,
-                24,
-                isDesktop ? 32 : 18,
-                0,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'SPECIMEN INDEX',
-                      style: TextStyle(
-                        color: AppTheme.signal,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2,
+      child: CallbackShortcuts(
+        bindings: {
+          SingleActivator(
+            LogicalKeyboardKey.keyK,
+            meta: usesCommandKey,
+            control: !usesCommandKey,
+          ): _searchFocus.requestFocus,
+        },
+        child: Focus(
+          autofocus: supportsKeyboardShortcuts,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = Breakpoints.columnsFor(width);
+              final gap = Breakpoints.gridGapFor(width);
+              final cellWidth =
+                  (constraints.maxWidth - padding * 2 - gap * (columns - 1)) /
+                  columns;
+              final extent = pokemonCardExtent(cellWidth);
+              return CustomScrollView(
+                controller: _scroll,
+                slivers: [
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      padding,
+                      AppSpacing.xl,
+                      padding,
+                      AppSpacing.xl,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _DirectoryHeader(
+                        state: state,
+                        searchFocus: _searchFocus,
+                        showShortcutHint: isWide && supportsKeyboardShortcuts,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'RESEARCH-GRADE FIELD POKÉDEX',
-                      style: TextStyle(
-                        color: AppTheme.paper,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    PokemonSearchBar(
-                      query: state.query,
-                      onChanged: notifier.setQuery,
-                    ),
-                    const SizedBox(height: 14),
-                    _TypeFilters(
-                      types: types,
-                      selected: state.selectedType,
-                      onSelected: notifier.setType,
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isDesktop ? 32 : 18,
-                vertical: 4,
-              ).copyWith(bottom: 28),
-              sliver: switch (status) {
-                ListInitialLoading() => const SliverToBoxAdapter(
-                  child: PokemonListSkeleton(),
-                ),
-                ListFailure(:final message) => SliverFillRemaining(
-                  child: ErrorView(message: message, onRetry: notifier.refresh),
-                ),
-                ListEmpty() => SliverFillRemaining(
-                  child: EmptyResultsView(
-                    query: state.query.trim(),
-                    type: state.selectedType,
-                    onClear: notifier.clearFilters,
                   ),
-                ),
-                ListLoaded(:final items) ||
-                ListLoadingMore(:final items) => _PokemonGrid(
-                  items: items,
-                  columns: columns,
-                  aspectRatio: cardAspectRatio,
-                ),
-              },
-            ),
-            SliverToBoxAdapter(
-              child: switch (status) {
-                ListLoadingMore() => const _PageLoadingIndicator(),
-                ListLoaded(loadMoreError: final String message) => _PageRetry(
-                  message: message,
-                  onRetry: notifier.loadMore,
-                ),
-                _ => const SizedBox.shrink(),
-              },
-            ),
-          ],
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: padding),
+                    sliver: switch (status) {
+                      ListInitialLoading() ||
+                      ListPageLoading() => PokemonGridSkeleton(
+                        columns: columns,
+                        gap: gap,
+                        cardExtent: extent,
+                        count: columns * 2,
+                      ),
+                      ListFailure(:final message) => SliverToBoxAdapter(
+                        child: ErrorView(
+                          message: message,
+                          onRetry: notifier.refresh,
+                        ),
+                      ),
+                      ListPageFailure(:final message) => SliverToBoxAdapter(
+                        child: ErrorView(
+                          title: 'Page Synchronization Failed',
+                          message: message,
+                          onRetry: notifier.retryPage,
+                        ),
+                      ),
+                      ListEmpty() => SliverToBoxAdapter(
+                        child: EmptyResultsView(
+                          query: state.query.trim(),
+                          type: state.selectedType,
+                          onClear: notifier.clearFilters,
+                        ),
+                      ),
+                      ListLoaded(:final items) => SliverGrid(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => PokemonCard(
+                            key: ValueKey(items[index].id),
+                            index: index,
+                            pokemon: items[index],
+                            onTap: () => _openDetail(items[index]),
+                          ),
+                          childCount: items.length,
+                        ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          mainAxisSpacing: gap,
+                          crossAxisSpacing: gap,
+                          mainAxisExtent: extent,
+                        ),
+                      ),
+                    },
+                  ),
+                  if (status case ListPaged(
+                    :final page,
+                    :final pageCount,
+                    :final totalCount,
+                  ))
+                    SliverPadding(
+                      padding: EdgeInsets.all(padding),
+                      sliver: SliverToBoxAdapter(
+                        child: _PagerPanel(
+                          page: page,
+                          pageCount: pageCount,
+                          totalCount: totalCount,
+                          compact: !isWide,
+                          stacked: width < Breakpoints.desktop,
+                          state: state,
+                          onPage: notifier.goToPage,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
 
-class _PokemonGrid extends StatelessWidget {
-  final List<PokemonSummary> items;
-  final int columns;
-  final double aspectRatio;
-  const _PokemonGrid({
-    required this.items,
-    required this.columns,
-    required this.aspectRatio,
+/// Status line, search, type ribbon and the specimen counter.
+class _DirectoryHeader extends ConsumerWidget {
+  final PokemonListState state;
+  final FocusNode searchFocus;
+  final bool showShortcutHint;
+
+  const _DirectoryHeader({
+    required this.state,
+    required this.searchFocus,
+    required this.showShortcutHint,
   });
 
   @override
-  Widget build(BuildContext context) => SliverGrid(
-    delegate: SliverChildBuilderDelegate((context, index) {
-      final pokemon = items[index];
-      return PokemonCard(
-        pokemon: pokemon,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PokemonDetailScreen(
-              nameOrId: pokemon.name,
-              heroTag: 'pokemon-image-${pokemon.id}',
-            ),
-          ),
-        ),
-      );
-    }, childCount: items.length),
-    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: columns,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: aspectRatio,
-    ),
-  );
-}
-
-/// Footer shown while the next page is being fetched.
-class _PageLoadingIndicator extends StatelessWidget {
-  const _PageLoadingIndicator();
-
-  @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.only(bottom: 28),
-    child: Center(
-      child: SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: AppTheme.signal,
-        ),
-      ),
-    ),
-  );
-}
-
-/// Footer shown when the next page failed; the loaded items stay visible.
-class _PageRetry extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-  const _PageRetry({required this.message, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
-    child: Column(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(pokemonListProvider.notifier);
+    final online = switch (state.status) {
+      ListFailure() || ListPageFailure() => false,
+      _ => true,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'NEXT PAGE UNAVAILABLE / $message',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppTheme.alert, fontSize: 10),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: onRetry,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppTheme.signal,
-            side: const BorderSide(color: AppTheme.line),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(3),
-            ),
+        Panel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text('FIELD SUB-NODE', style: AppTypography.title),
+                  OnlineBadge(online: online),
+                  LatencyReadout(source: state.lastSource),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              const Text(
+                'Live specimen stream from pokeapi.co',
+                style: AppTypography.bodySmall,
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              PokemonSearchBar(
+                query: state.query,
+                onChanged: notifier.setQuery,
+                focusNode: searchFocus,
+                showShortcutHint: showShortcutHint,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _TypeRibbon(
+                selected: state.selectedType,
+                onSelected: notifier.setType,
+              ),
+            ],
           ),
-          icon: const Icon(Icons.refresh_rounded, size: 16),
-          label: const Text('RETRY PAGE'),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              state.isFiltered ? 'Search Results' : 'Specimen Repository',
+              style: AppTypography.headline,
+            ),
+            _Counter(state: state),
+          ],
         ),
       ],
-    ),
-  );
+    );
+  }
 }
 
-class _TypeFilters extends StatelessWidget {
-  final List<String> types;
+/// "1,025 specimens indexed", computed from the loaded index or matches.
+class _Counter extends StatelessWidget {
+  final PokemonListState state;
+  const _Counter({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = switch (state.status) {
+      ListPaged(:final totalCount) => totalCount,
+      ListEmpty() => 0,
+      _ => null,
+    };
+    if (count == null) return const SizedBox.shrink();
+    final noun = state.isFiltered ? 'matches' : 'specimens indexed';
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xxs + 1,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.container,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+      child: Text(
+        '${formatCount(count)} $noun',
+        style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+      ),
+    );
+  }
+}
+
+/// 1025 -> "1,025".
+String formatCount(int value) => value.toString().replaceAllMapped(
+  RegExp(r'\B(?=(\d{3})+(?!\d))'),
+  (_) => ',',
+);
+
+class _TypeRibbon extends StatelessWidget {
   final String? selected;
   final ValueChanged<String?> onSelected;
-  const _TypeFilters({
-    required this.types,
-    required this.selected,
-    required this.onSelected,
-  });
+  const _TypeRibbon({required this.selected, required this.onSelected});
+
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    child: Row(
-      children: [
-        _FilterChip(
-          label: 'ALL TYPES',
-          active: selected == null,
-          onTap: () => onSelected(null),
-        ),
-        ...types.map(
-          (type) => _FilterChip(
-            label: type.toUpperCase(),
-            active: selected == type,
-            onTap: () => onSelected(type),
+  Widget build(BuildContext context) {
+    final types = pokemonTypeColors.keys.toList()..sort();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _TypeChip(
+            label: 'ALL TYPES',
+            color: AppColors.crimson,
+            active: selected == null,
+            onTap: () => onSelected(null),
           ),
-        ),
-      ],
-    ),
-  );
+          for (final type in types)
+            _TypeChip(
+              label: type.toUpperCase(),
+              color: colorForType(type),
+              active: selected == type,
+              onTap: () => onSelected(type),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
-class _FilterChip extends StatelessWidget {
+class _TypeChip extends StatelessWidget {
   final String label;
+  final Color color;
   final bool active;
   final VoidCallback onTap;
-  const _FilterChip({
+
+  const _TypeChip({
     required this.label,
+    required this.color,
     required this.active,
     required this.onTap,
   });
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(right: 7),
-    child: OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: active ? AppTheme.ink : AppTheme.muted,
-        backgroundColor: active ? AppTheme.signal : Colors.transparent,
-        side: BorderSide(color: active ? AppTheme.signal : AppTheme.line),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: .5,
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: AppMotion.hover,
+    margin: const EdgeInsets.only(right: AppSpacing.sm),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(AppRadii.pill),
+      boxShadow: [
+        if (active)
+          BoxShadow(
+            color: color.withValues(alpha: .55),
+            blurRadius: 14,
+            spreadRadius: -2,
+          ),
+      ],
+    ),
+    child: Semantics(
+      button: true,
+      selected: active,
+      child: Material(
+        color: active ? color : AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+          side: BorderSide(color: active ? color : AppColors.border),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const StadiumBorder(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.textPrimary : color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  label,
+                  style: AppTypography.caption.copyWith(
+                    color: active
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     ),
   );
+}
+
+/// "Showing 1 – 30 of 1,025" + the pager + the latency readout.
+class _PagerPanel extends StatelessWidget {
+  final int page;
+  final int pageCount;
+  final int totalCount;
+  final bool compact;
+  final bool stacked;
+  final PokemonListState state;
+  final ValueChanged<int> onPage;
+
+  const _PagerPanel({
+    required this.page,
+    required this.pageCount,
+    required this.totalCount,
+    required this.compact,
+    required this.stacked,
+    required this.state,
+    required this.onPage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final first = (page - 1) * AppConstants.pageSize + 1;
+    final last = (page * AppConstants.pageSize).clamp(0, totalCount);
+    final summary = Text(
+      'Showing $first – $last of ${formatCount(totalCount)}',
+      style: AppTypography.bodySmall,
+    );
+    final pager = PaginationBar(
+      page: page,
+      pageCount: pageCount,
+      onPage: onPage,
+      compact: compact,
+    );
+    return Panel(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: stacked
+          ? Column(
+              children: [
+                pager,
+                const SizedBox(height: AppSpacing.md),
+                summary,
+                const SizedBox(height: AppSpacing.xs),
+                LatencyReadout(source: state.lastSource),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: summary),
+                pager,
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: LatencyReadout(source: state.lastSource),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
 }

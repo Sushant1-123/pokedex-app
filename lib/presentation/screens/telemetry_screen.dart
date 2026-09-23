@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants.dart';
+import '../../core/design_tokens.dart';
 import '../../core/result.dart';
 import '../../core/theme.dart';
-import '../../core/constants.dart';
 import '../providers/app_navigation_provider.dart';
 import '../providers/telemetry_provider.dart';
 import '../widgets/error_view.dart';
 import '../widgets/field_shell.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/panel.dart';
+import '../widgets/pokemon_card.dart';
+import '../widgets/stat_bar.dart';
 
 class TelemetryScreen extends ConsumerWidget {
   const TelemetryScreen({super.key});
@@ -18,8 +23,8 @@ class TelemetryScreen extends ConsumerWidget {
       active: AppDestination.telemetry,
       onRefresh: () => ref.read(telemetryProvider.notifier).load(),
       child: switch (result) {
-        Loading() => const Center(child: CircularProgressIndicator()),
-        Failure(message: final message) => ErrorView(
+        Loading() => const _TelemetrySkeleton(),
+        Failure(:final message) => ErrorView(
           message: message,
           onRetry: () => ref.read(telemetryProvider.notifier).load(),
         ),
@@ -27,6 +32,16 @@ class TelemetryScreen extends ConsumerWidget {
       },
     );
   }
+}
+
+class _TelemetrySkeleton extends StatelessWidget {
+  const _TelemetrySkeleton();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.all(AppSpacing.xl),
+    child: Panel(child: SectionSkeleton(lines: 8)),
+  );
 }
 
 class _TelemetryContent extends StatelessWidget {
@@ -38,114 +53,95 @@ class _TelemetryContent extends StatelessWidget {
     final sortedTypes = data.typeCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final maxCount = sortedTypes.isEmpty ? 1 : sortedTypes.first.value;
-    final width = MediaQuery.of(context).size.width;
-    final isDesktop = width >= Breakpoints.desktop;
+    final padding = Breakpoints.pagePaddingFor(
+      MediaQuery.sizeOf(context).width,
+    );
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-            isDesktop ? 32 : 18,
-            24,
-            isDesktop ? 32 : 18,
-            28,
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(padding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'DIAGNOSTIC MATRIX',
+            style: AppTypography.label.copyWith(color: AppColors.cyan),
           ),
-          sliver: SliverToBoxAdapter(
+          const SizedBox(height: AppSpacing.sm),
+          const Text('Specimen Field Readings', style: AppTypography.headline),
+          const SizedBox(height: AppSpacing.sm),
+          const Text(
+            'SAMPLE: THE FIRST ${TelemetryNotifier.sampleSize} SPECIMENS OF THE '
+            'POKEAPI INDEX (#0001 ONWARDS), NOT THE FULL CATALOG.',
+            style: AppTypography.caption,
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.md,
+            children: [
+              _Metric(
+                label: 'SAMPLED SPECIMENS',
+                value: '${data.totalSpecimens}',
+              ),
+              _Metric(
+                label: 'TYPE CLASSES',
+                value: '${data.typeCounts.length}',
+              ),
+              _Metric(
+                label: 'AVG HEIGHT',
+                value: '${data.averageHeightM.toStringAsFixed(1)} m',
+              ),
+              _Metric(
+                label: 'AVG WEIGHT',
+                value: '${data.averageWeightKg.toStringAsFixed(1)} kg',
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Panel(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _TelemetryHeading(),
-                const SizedBox(height: 22),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    _Metric(
-                      label: 'SAMPLED SPECIMENS',
-                      value: '${data.totalSpecimens}',
-                    ),
-                    _Metric(
-                      label: 'TYPE CLASSES',
-                      value: '${data.typeCounts.length}',
-                    ),
-                    _Metric(
-                      label: 'AVG HEIGHT',
-                      value: '${data.averageHeightM.toStringAsFixed(1)} m',
-                    ),
-                    _Metric(
-                      label: 'AVG WEIGHT',
-                      value: '${data.averageWeightKg.toStringAsFixed(1)} kg',
-                    ),
-                  ],
+                const SectionHeader(
+                  title: 'TYPE DISTRIBUTION',
+                  icon: Icons.donut_small_outlined,
                 ),
-                const SizedBox(height: 28),
-                const _SectionLabel(label: 'TYPE DISTRIBUTION'),
-                const SizedBox(height: 12),
                 if (sortedTypes.isEmpty)
                   const Text(
                     'NO LOADED TELEMETRY',
-                    style: TextStyle(color: AppTheme.muted, fontSize: 12),
+                    style: AppTypography.bodySmall,
                   )
                 else
-                  ...sortedTypes.map(
-                    (entry) => _TypeReading(
+                  for (final entry in sortedTypes)
+                    _TypeReading(
                       type: entry.key,
                       count: entry.value,
                       maximum: maxCount,
                     ),
-                  ),
-                const SizedBox(height: 24),
-                const _SectionLabel(label: 'AVERAGE BASE STATS'),
-                const SizedBox(height: 12),
-                ...data.averageBaseStats.entries.map(
-                  (entry) => _StatReading(name: entry.key, value: entry.value),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'SAMPLE: THE FIRST ${TelemetryNotifier.sampleSize} SPECIMENS '
-                  'OF THE POKEAPI INDEX (#001 ONWARDS), NOT THE FULL CATALOG.',
-                  style: TextStyle(
-                    color: AppTheme.muted,
-                    fontSize: 10,
-                    letterSpacing: .6,
-                  ),
-                ),
               ],
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.xl),
+          Panel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SectionHeader(
+                  title: 'AVERAGE BASE STATS',
+                  icon: Icons.bar_chart_rounded,
+                ),
+                for (final entry in data.averageBaseStats.entries)
+                  StatBar(
+                    label: statLabel(entry.key),
+                    value: entry.value.round(),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
-}
-
-class _TelemetryHeading extends StatelessWidget {
-  const _TelemetryHeading();
-
-  @override
-  Widget build(BuildContext context) => const Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        'TELEMETRY',
-        style: TextStyle(
-          color: AppTheme.signal,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 2,
-        ),
-      ),
-      SizedBox(height: 8),
-      Text(
-        'SPECIMEN FIELD READINGS',
-        style: TextStyle(
-          color: AppTheme.paper,
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    ],
-  );
 }
 
 class _Metric extends StatelessWidget {
@@ -154,35 +150,18 @@ class _Metric extends StatelessWidget {
   const _Metric({required this.label, required this.value});
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => SizedBox(
     width: 190,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: AppTheme.panel,
-      border: Border.all(color: AppTheme.line),
-      borderRadius: BorderRadius.circular(3),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppTheme.paper,
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppTheme.muted,
-            fontSize: 10,
-            letterSpacing: 1,
-          ),
-        ),
-      ],
+    child: Panel(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value, style: AppTypography.metric),
+          const SizedBox(height: AppSpacing.xs),
+          Text(label, style: AppTypography.caption),
+        ],
+      ),
     ),
   );
 }
@@ -201,27 +180,23 @@ class _TypeReading extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = colorForType(type);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         children: [
           SizedBox(
             width: 90,
             child: Text(
-              type.toUpperCase(),
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
+              titleCase(type).toUpperCase(),
+              style: AppTypography.label.copyWith(color: color),
             ),
           ),
           Expanded(
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppRadii.pill),
               child: LinearProgressIndicator(
                 minHeight: 8,
                 value: count / maximum,
-                backgroundColor: AppTheme.panelRaised,
+                backgroundColor: AppColors.track,
                 color: color,
               ),
             ),
@@ -231,75 +206,13 @@ class _TypeReading extends StatelessWidget {
             child: Text(
               '$count',
               textAlign: TextAlign.right,
-              style: const TextStyle(color: AppTheme.paper, fontSize: 11),
+              style: AppTypography.numeric.copyWith(
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
         ],
       ),
     );
   }
-}
-
-class _StatReading extends StatelessWidget {
-  final String name;
-  final double value;
-  const _StatReading({required this.name, required this.value});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Row(
-      children: [
-        SizedBox(
-          width: 90,
-          child: Text(
-            name.replaceAll('-', ' ').toUpperCase(),
-            style: const TextStyle(
-              color: AppTheme.muted,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Expanded(
-          child: LinearProgressIndicator(
-            minHeight: 8,
-            value: (value / 255).clamp(0.0, 1.0),
-            backgroundColor: AppTheme.panelRaised,
-            color: AppTheme.signal,
-          ),
-        ),
-        SizedBox(
-          width: 42,
-          child: Text(
-            value.toStringAsFixed(1),
-            textAlign: TextAlign.right,
-            style: const TextStyle(color: AppTheme.paper, fontSize: 11),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  const _SectionLabel({required this.label});
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(width: 5, height: 5, color: AppTheme.signal),
-      const SizedBox(width: 8),
-      Text(
-        label,
-        style: const TextStyle(
-          color: AppTheme.muted,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.5,
-        ),
-      ),
-    ],
-  );
 }

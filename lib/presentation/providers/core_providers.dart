@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/datasources/cry_player.dart';
 import '../../data/datasources/pokeapi_client.dart';
 import '../../data/datasources/pokemon_cache.dart';
 import '../../data/repositories/pokemon_repository.dart';
+import 'node_status_provider.dart';
 
 /// Simple DI providers. The cache instance is initialized once in main()
 /// and overridden into the ProviderScope, so every provider below gets
@@ -20,5 +22,12 @@ final pokemonRepositoryProvider = Provider<PokemonRepository>((ref) {
   return PokemonRepository(
     client: ref.watch(pokeApiClientProvider),
     cache: ref.watch(pokemonCacheProvider),
+    onNetwork: (event) => ref.read(nodeStatusProvider.notifier).record(event),
   );
+});
+
+final cryPlayerProvider = Provider<CryPlayer>((ref) {
+  final player = CryPlayer();
+  ref.onDispose(player.dispose);
+  return player;
 });
