@@ -31,8 +31,58 @@
 
   <title>Pokedex</title>
   <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b0f17">
+  <!-- Fetch the intro trainer while Flutter boots, so it never pops in. -->
+  <link rel="preload" href="assets/assets/images/intro/trainer.webp" as="image" type="image/webp">
+
+  <!-- Boot screen in the app's surface colour, so there is no white flash
+       while Flutter loads. Removed on Flutter's first frame. -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b0f17; }
+    #boot {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 18px;
+      background: #0b0f17; transition: opacity 200ms ease-out;
+    }
+    #boot.done { opacity: 0; pointer-events: none; }
+    #boot .ball {
+      position: relative; width: 44px; height: 44px; border-radius: 50%;
+      background: linear-gradient(#ef4444 0 50%, #e8eaf0 50% 100%);
+      border: 3px solid #0b0f17; box-shadow: 0 0 0 1px #272b34;
+      animation: spin 900ms linear infinite;
+    }
+    #boot .ball::before {
+      content: ""; position: absolute; left: 0; right: 0; top: 50%;
+      height: 4px; margin-top: -2px; background: #0b0f17;
+    }
+    #boot .ball::after {
+      content: ""; position: absolute; left: 50%; top: 50%;
+      width: 12px; height: 12px; margin: -9px 0 0 -9px; border-radius: 50%;
+      background: #e8eaf0; border: 3px solid #0b0f17;
+    }
+    #boot .label {
+      color: #9097a2; font: 700 10px/1 system-ui, sans-serif;
+      letter-spacing: 2.4px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      #boot .ball { animation: none; }
+    }
+  </style>
 </head>
 <body>
+  <div id="boot" role="progressbar" aria-label="Loading Pokedex">
+    <div class="ball"></div>
+    <div class="label">INITIALISING FIELD DATABASE</div>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var boot = document.getElementById('boot');
+      if (!boot) return;
+      boot.classList.add('done');
+      setTimeout(function () { boot.remove(); }, 250);
+    });
+  </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
