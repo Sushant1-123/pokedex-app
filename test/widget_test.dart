@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:pokedex_app/core/constants.dart';
 import 'package:pokedex_app/main.dart';
 import 'package:pokedex_app/data/datasources/pokeapi_client.dart';
 import 'package:pokedex_app/data/datasources/pokemon_cache.dart';
@@ -31,6 +32,28 @@ void main() {
     expect(find.text('SPECIMEN INDEX'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
   });
+
+  testWidgets('scrolling near the bottom loads the next page', (tester) async {
+    final repository = _PagedPokemonRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [pokemonRepositoryProvider.overrideWithValue(repository)],
+        child: const PokedexApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(repository.offsets, [0]);
+
+    await tester.fling(
+      find.byType(CustomScrollView),
+      const Offset(0, -20000),
+      5000,
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.offsets, containsAllInOrder([0, AppConstants.pageSize]));
+  });
 }
 
 class _TestPokemonRepository extends PokemonRepository {
@@ -50,6 +73,34 @@ class _TestPokemonRepository extends PokemonRepository {
           imageUrl: 'https://example.com/pikachu.png',
           types: ['electric'],
         ),
+      ],
+      false,
+    );
+  }
+}
+
+/// Serves full pages of numbered Pokemon and records which offsets load.
+class _PagedPokemonRepository extends PokemonRepository {
+  _PagedPokemonRepository()
+    : super(client: PokeApiClient(), cache: PokemonCache());
+
+  final offsets = <int>[];
+
+  @override
+  Future<(List<PokemonSummary> items, bool fromCache)> getPokemonPage({
+    required int offset,
+    required int limit,
+  }) async {
+    offsets.add(offset);
+    return (
+      [
+        for (var id = offset + 1; id <= offset + limit; id++)
+          PokemonSummary(
+            id: id,
+            name: 'pokemon-$id',
+            imageUrl: pokemonArtworkUrl(id),
+            types: const ['normal'],
+          ),
       ],
       false,
     );
