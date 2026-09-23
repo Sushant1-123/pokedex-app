@@ -1,89 +1,106 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pokedex_app/core/constants.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_app/core/result.dart';
-import 'package:pokedex_app/data/datasources/pokeapi_client.dart';
-import 'package:pokedex_app/data/datasources/pokemon_cache.dart';
-import 'package:pokedex_app/data/models/pokemon_detail.dart';
-import 'package:pokedex_app/data/models/pokemon_summary.dart';
-import 'package:pokedex_app/data/repositories/pokemon_repository.dart';
+import 'package:pokedex_app/data/models/pokemon_index_entry.dart';
+import 'package:pokedex_app/data/models/pokemon_species.dart';
 import 'package:pokedex_app/presentation/providers/core_providers.dart';
 import 'package:pokedex_app/presentation/providers/pokemon_detail_provider.dart';
 
+import 'support/fakes.dart';
+
 void main() {
-  test('cache contract uses a one-hour TTL', () {
-    expect(AppConstants.cacheTtl, const Duration(hours: 1));
+  group('prev/next neighbours', () {
+    final index = catalog(
+      1025,
+      extra: const [PokemonIndexEntry(id: 10034, name: 'charizard-mega-x')],
+    );
+
+    test('#1 has no previous, only a next', () {
+      final n = neighboursOf(1, index);
+      expect(n.previous, isNull);
+      expect(n.next?.id, 2);
+    });
+
+    test('the last species has no next', () {
+      final n = neighboursOf(1025, index);
+      expect(n.previous?.id, 1024);
+      expect(n.next, isNull);
+    });
+
+    test('a middle species has both, skipping forms', () {
+      final n = neighboursOf(6, index);
+      expect((n.previous?.id, n.next?.id), (5, 7));
+    });
+
+    test('alternate forms have no neighbours', () {
+      final n = neighboursOf(10034, index);
+      expect((n.previous, n.next), (null, null));
+    });
   });
 
-  test('detail provider reaches success through the repository', () async {
-    final container = ProviderContainer(
-      overrides: [
-        pokemonRepositoryProvider.overrideWithValue(
-          _FakeRepository(detail: _detail),
-        ),
-      ],
-    );
+  group('detail provider', () {
+    test('loads the record, then each section', () async {
+      final container = ProviderContainer(
+        overrides: [
+          pokemonRepositoryProvider.overrideWithValue(
+            FakeRepository(index: catalog(10)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final provider = pokemonDetailProvider(3);
+      expect(container.read(provider), isA<Loading<PokemonDossier>>());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final dossier =
+          (container.read(provider) as Success<PokemonDossier>).data;
+      expect(dossier.detail.id, 3);
+      expect(dossier.species, isA<Success<PokemonSpecies>>());
+      expect(dossier.evolution, isA<Success<Object>>());
+      expect(dossier.defenses, isA<Success<Object>>());
+      expect(
+        (dossier.neighbours.previous?.id, dossier.neighbours.next?.id),
+        (2, 4),
+      );
+    });
+
+    test('exposes repository failures', () async {
+      final repository = FakeRepository()..failIds.add(3);
+      final container = ProviderContainer(
+        overrides: [pokemonRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final provider = pokemonDetailProvider(3);
+      await container.read(provider.notifier).load();
+
+      final result = container.read(provider);
+      expect(result, isA<Failure<PokemonDossier>>());
+      expect((result as Failure).message, contains('offline'));
+    });
+
+    test('marks a network result as not from cache', () async {
+      final container = ProviderContainer(
+        overrides: [
+          pokemonRepositoryProvider.overrideWithValue(FakeRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(pokemonDetailProvider(1).notifier).load();
+
+      final result = container.read(pokemonDetailProvider(1));
+      expect((result as Success).fromCache, isFalse);
+    });
+  });
+
+  test('the animated sprite choice is remembered for the session', () {
+    final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    final provider = pokemonDetailProvider('pikachu');
-    expect(container.read(provider), isA<Loading<PokemonDetail>>());
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-
-    final result = container.read(provider);
-    expect(result, isA<Success<PokemonDetail>>());
-    expect((result as Success<PokemonDetail>).data.name, 'pikachu');
+    expect(container.read(animatedSpriteProvider), isFalse);
+    container.read(animatedSpriteProvider.notifier).toggle();
+    expect(container.read(animatedSpriteProvider), isTrue);
   });
-
-  test('detail provider exposes repository failures', () async {
-    final container = ProviderContainer(
-      overrides: [
-        pokemonRepositoryProvider.overrideWithValue(
-          _FakeRepository(error: StateError('offline')),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    final provider = pokemonDetailProvider('pikachu');
-    await container.read(provider.notifier).load();
-
-    final result = container.read(provider);
-    expect(result, isA<Failure<PokemonDetail>>());
-    expect((result as Failure<PokemonDetail>).message, contains('offline'));
-  });
-}
-
-const _detail = PokemonDetail(
-  id: 25,
-  name: 'pikachu',
-  imageUrl: 'pikachu.png',
-  types: ['electric'],
-  stats: [PokemonStat(name: 'speed', base: 90)],
-  abilities: ['static'],
-  heightM: 0.4,
-  weightKg: 6.0,
-);
-
-class _FakeRepository extends PokemonRepository {
-  final PokemonDetail? detail;
-  final Object? error;
-
-  _FakeRepository({this.detail, this.error})
-    : super(client: PokeApiClient(), cache: PokemonCache());
-
-  @override
-  Future<(PokemonDetail detail, bool fromCache)> getPokemonDetail(
-    String nameOrId,
-  ) async {
-    if (error != null) throw error!;
-    return (detail!, true);
-  }
-
-  @override
-  Future<(List<PokemonSummary> items, bool fromCache)> getPokemonPage({
-    required int offset,
-    required int limit,
-  }) async {
-    return (<PokemonSummary>[], true);
-  }
 }
