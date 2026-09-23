@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'design_tokens.dart';
 
 /// Central constants. Keeping these in one place makes the "sole data source"
 /// and "1h cache" requirements easy to audit at a glance.
@@ -10,8 +11,13 @@ class AppConstants {
   /// Requirement: cache API responses for 1 hour using a persistent store.
   static const Duration cacheTtl = Duration(hours: 1);
 
-  /// How many Pokemon to request per page from PokeAPI's list endpoint.
-  static const int pageSize = 40;
+  /// Cards per directory page. 30 fills the 2-, 3- and 5-column grids
+  /// without a ragged last row.
+  static const int pageSize = 30;
+
+  /// PokeAPI numbers alternate forms (megas, regional forms, ...) from 10001
+  /// upwards; everything below is a base species.
+  static const int formIdStart = 10000;
 
   /// How long typing must pause before a search request is made.
   static const Duration searchDebounce = Duration(milliseconds: 300);
@@ -19,11 +25,25 @@ class AppConstants {
   /// Large enough to return every Pokemon in one request for the name index.
   static const int nameIndexLimit = 100000;
 
-  static const String pokemonListBoxName = 'pokemon_list_cache';
-  static const String pokemonDetailBoxName = 'pokemon_detail_cache';
+  /// Suffixed because the cached record shape changed (cries, sprites,
+  /// abilities); the old box is simply never read again.
+  static const String pokemonDetailBoxName = 'pokemon_detail_cache_v2';
   static const String pokemonIndexBoxName = 'pokemon_index_cache';
+  static const String pokemonSpeciesBoxName = 'pokemon_species_cache';
+  static const String evolutionChainBoxName = 'evolution_chain_cache';
+  static const String habitatBoxName = 'pokemon_habitat_cache';
+  static const String abilityBoxName = 'ability_cache';
+
+  /// At most this many requests in flight when loading many resources
+  /// (e.g. all 18 types for the type chart).
+  static const int maxConcurrentRequests = 4;
   static const String savedRecordsBoxName = 'saved_pokemon_records';
 }
+
+/// Takes the id from the trailing path segment of a PokeAPI resource url,
+/// e.g. `.../pokemon-species/25/` -> 25.
+int idFromResourceUrl(String url) =>
+    int.parse(Uri.parse(url).pathSegments.lastWhere((s) => s.isNotEmpty));
 
 String pokemonArtworkUrl(int id) =>
     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/$id.png';
@@ -53,3 +73,31 @@ const Map<String, Color> pokemonTypeColors = {
 
 Color colorForType(String type) =>
     pokemonTypeColors[type.toLowerCase()] ?? const Color(0xFF68A090);
+
+/// Glow colour for a Pokemon: its species colour mapped through
+/// [AppColors.speciesGlow], falling back to its primary type colour.
+Color pokemonGlowColor(String? speciesColor, List<String> types) =>
+    AppColors.speciesGlow[speciesColor] ??
+    (types.isEmpty ? AppColors.cyan : colorForType(types.first));
+
+/// Maps [items] with [task], running at most [limit] tasks at a time, and
+/// returns the results in input order.
+Future<List<R>> mapWithConcurrency<T, R>(
+  List<T> items,
+  int limit,
+  Future<R> Function(T item) task,
+) async {
+  final results = List<R?>.filled(items.length, null);
+  var next = 0;
+  Future<void> worker() async {
+    while (next < items.length) {
+      final i = next++;
+      results[i] = await task(items[i]);
+    }
+  }
+
+  await Future.wait([
+    for (var w = 0; w < limit && w < items.length; w++) worker(),
+  ]);
+  return results.cast<R>();
+}

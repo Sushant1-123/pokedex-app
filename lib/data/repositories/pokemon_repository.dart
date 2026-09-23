@@ -1,89 +1,172 @@
 import '../datasources/pokeapi_client.dart';
 import '../datasources/pokemon_cache.dart';
-import '../models/pokemon_summary.dart';
+import '../models/ability.dart';
+import '../models/evolution_chain.dart';
+import '../models/fetch_source.dart';
+import '../models/habitat.dart';
 import '../models/pokemon_detail.dart';
 import '../models/pokemon_index_entry.dart';
+import '../models/pokemon_species.dart';
+import '../models/pokemon_summary.dart';
+import '../models/pokemon_type_data.dart';
+import '../models/type_defenses.dart';
 
 /// The repository is the only thing the presentation layer talks to.
-/// It decides cache-vs-network so screens/providers stay free of that logic.
+/// It decides cache-vs-network so screens/providers stay free of that logic,
+/// and reports where each result came from as a [FetchSource].
+/// Outcome of one network request, reported to [PokemonRepository.onNetwork]:
+/// `latency` is null when the request failed.
+typedef NetworkEvent = ({Duration? latency, int cacheEntries});
+
 class PokemonRepository {
   final PokeApiClient _client;
   final PokemonCache _cache;
 
+  /// Called after every network request (not for cache hits), so the UI
+  /// can show real connection state without polling.
+  final void Function(NetworkEvent event)? onNetwork;
+
   static const catalogIndexKey = 'all';
-  static String typeIndexKey(String type) => 'type:$type';
+  static String typeDataKey(String type) => 'typedata:$type';
 
   PokemonRepository({
     required PokeApiClient client,
     required PokemonCache cache,
+    this.onNetwork,
   }) : _client = client,
        _cache = cache;
 
-  Future<(List<PokemonSummary> items, bool fromCache)> getPokemonPage({
-    required int offset,
-    required int limit,
-  }) async {
-    final cacheKey = '$offset:$limit';
-    final cached = _cache.readListPage(cacheKey);
-    if (cached != null) {
-      final items = cached
-          .cast<Map<String, dynamic>>()
-          .map(PokemonSummary.fromCacheJson)
-          .toList();
-      return (items, true);
-    }
+  /// Cached API responses across all boxes.
+  int get cacheEntryCount => _cache.entryCount;
 
-    final details = await _client.fetchPokemonPage(
-      offset: offset,
-      limit: limit,
-    );
-    // The page already downloaded every full record, so cache those too:
-    // opening a card or computing telemetry then needs no extra request.
-    await Future.wait(
-      details.map((d) => _cache.writeDetail(d.name, d.toCacheJson())),
-    );
-    final items = details.map((d) => d.toSummary()).toList();
-    await _cache.writeListPage(
-      cacheKey,
-      items.map((p) => p.toCacheJson()).toList(),
-    );
-    return (items, false);
-  }
+  /// Name + id of every Pokemon (base species and forms), sorted by id.
+  Future<(List<PokemonIndexEntry> entries, FetchSource source)>
+  getPokemonIndex() => _cached(
+    CacheBox.nameIndex,
+    catalogIndexKey,
+    _client.fetchPokemonIndex,
+    encode: (entries) => [for (final e in entries) e.toCacheJson()],
+    decode: (json) => [
+      for (final e in json as List<dynamic>)
+        PokemonIndexEntry.fromCacheJson(e as Map<String, dynamic>),
+    ],
+  );
 
-  /// Resolves index matches (name + id only) to cards with types and
+  /// Members and damage relations of one type, from GET /type/{name}.
+  Future<(PokemonTypeData data, FetchSource source)> getTypeData(String type) =>
+      _cached(
+        CacheBox.nameIndex,
+        typeDataKey(type),
+        () => _client.fetchTypeData(type),
+        encode: (data) => data.toCacheJson(),
+        decode: (json) =>
+            PokemonTypeData.fromCacheJson(json as Map<String, dynamic>),
+      );
+
+  Future<(PokemonDetail detail, FetchSource source)> getPokemonDetail(int id) =>
+      _cached(
+        CacheBox.detail,
+        '$id',
+        () => _client.fetchPokemonDetail(id),
+        encode: (detail) => detail.toCacheJson(),
+        decode: (json) =>
+            PokemonDetail.fromCacheJson(json as Map<String, dynamic>),
+      );
+
+  Future<(PokemonSpecies species, FetchSource source)> getSpecies(
+    int speciesId,
+  ) => _cached(
+    CacheBox.species,
+    '$speciesId',
+    () => _client.fetchSpecies(speciesId),
+    encode: (species) => species.toCacheJson(),
+    decode: (json) =>
+        PokemonSpecies.fromCacheJson(json as Map<String, dynamic>),
+  );
+
+  Future<(EvolutionChain chain, FetchSource source)> getEvolutionChain(
+    int chainId,
+  ) => _cached(
+    CacheBox.evolutionChain,
+    '$chainId',
+    () => _client.fetchEvolutionChain(chainId),
+    encode: (chain) => chain.toCacheJson(),
+    decode: (json) =>
+        EvolutionChain.fromCacheJson(json as Map<String, dynamic>),
+  );
+
+  /// Names of every habitat.
+  Future<(List<String> names, FetchSource source)> getHabitatNames() => _cached(
+    CacheBox.habitat,
+    'all',
+    _client.fetchHabitatNames,
+    encode: (names) => names,
+    decode: (json) => (json as List<dynamic>).cast<String>(),
+  );
+
+  Future<(PokemonHabitat habitat, FetchSource source)> getHabitat(
+    String name,
+  ) => _cached(
+    CacheBox.habitat,
+    'habitat:$name',
+    () => _client.fetchHabitat(name),
+    encode: (habitat) => habitat.toCacheJson(),
+    decode: (json) =>
+        PokemonHabitat.fromCacheJson(json as Map<String, dynamic>),
+  );
+
+  /// Every ability, for the Ability Codex search.
+  Future<(List<AbilityEntry> abilities, FetchSource source)>
+  getAbilityIndex() => _cached(
+    CacheBox.ability,
+    'all',
+    _client.fetchAbilityIndex,
+    encode: (entries) => [
+      for (final e in entries) {'id': e.id, 'name': e.name},
+    ],
+    decode: (json) => [
+      for (final e in json as List<dynamic>)
+        (
+          id: (e as Map<String, dynamic>)['id'] as int,
+          name: e['name'] as String,
+        ),
+    ],
+  );
+
+  Future<(AbilityDetail ability, FetchSource source)> getAbility(String name) =>
+      _cached(
+        CacheBox.ability,
+        'ability:$name',
+        () => _client.fetchAbility(name),
+        encode: (ability) => ability.toCacheJson(),
+        decode: (json) =>
+            AbilityDetail.fromCacheJson(json as Map<String, dynamic>),
+      );
+
+  /// Resolves index entries (name + id only) to cards with types, stats and
   /// artwork. Each record goes through the detail cache.
-  Future<(List<PokemonSummary> items, bool fromCache)> getPokemonSummaries(
+  Future<(List<PokemonSummary> items, FetchSource source)> getPokemonSummaries(
     List<PokemonIndexEntry> entries,
   ) async {
     final details = await Future.wait(
-      entries.map((entry) => getPokemonDetail(entry.name)),
+      entries.map((entry) => getPokemonDetail(entry.id)),
     );
     return (
-      details.map((entry) => entry.$1.toSummary()).toList(),
-      details.every((entry) => entry.$2),
+      [for (final (detail, _) in details) detail.toSummary()],
+      FetchSource.combine([for (final (_, source) in details) source]),
     );
   }
 
-  /// Name + id of every Pokemon, used to search beyond the loaded pages.
-  Future<(List<PokemonIndexEntry> entries, bool fromCache)> getPokemonIndex() =>
-      _getIndex(catalogIndexKey, _client.fetchPokemonIndex);
-
-  /// Name + id of every Pokemon of [type], across the whole catalog.
-  Future<(List<PokemonIndexEntry> entries, bool fromCache)> getTypeMembers(
-    String type,
-  ) => _getIndex(typeIndexKey(type), () => _client.fetchTypeMembers(type));
-
-  Future<(PokemonDetail detail, bool fromCache)> getPokemonDetail(
-    String nameOrId,
+  /// Defensive type matrix for a Pokemon with [types], computed from the
+  /// cached /type/{name} damage relations.
+  Future<(TypeDefenses defenses, FetchSource source)> getTypeDefenses(
+    List<String> types,
   ) async {
-    final cached = _cache.readDetail(nameOrId);
-    if (cached != null) {
-      return (PokemonDetail.fromCacheJson(cached), true);
-    }
-
-    final fresh = await _client.fetchPokemonDetail(nameOrId);
-    await _cache.writeDetail(nameOrId, fresh.toCacheJson());
-    return (fresh, false);
+    final results = await Future.wait(types.map(getTypeData));
+    return (
+      TypeDefenses.calculate([for (final (data, _) in results) data.damage]),
+      FetchSource.combine([for (final (_, source) in results) source]),
+    );
   }
 
   /// Bookmarked Pokemon, sorted by id. Stored without a TTL: these are the
@@ -97,21 +180,32 @@ class PokemonRepository {
 
   Future<void> deleteSavedRecord(int id) => _cache.deleteSavedRecord(id);
 
-  Future<(List<PokemonIndexEntry> entries, bool fromCache)> _getIndex(
+  /// Cache-then-network for one entry; the network path is timed so the UI
+  /// can show the real request latency.
+  Future<(T value, FetchSource source)> _cached<T>(
+    CacheBox box,
     String key,
-    Future<List<PokemonIndexEntry>> Function() fetch,
-  ) async {
-    final cached = _cache.readIndex(key);
-    if (cached != null) {
-      final entries = cached
-          .cast<Map<String, dynamic>>()
-          .map(PokemonIndexEntry.fromCacheJson)
-          .toList();
-      return (entries, true);
-    }
+    Future<T> Function() fetch, {
+    required Object Function(T value) encode,
+    required T Function(Object json) decode,
+  }) async {
+    final cached = _cache.read(box, key);
+    if (cached != null) return (decode(cached), const CacheHit());
 
-    final fresh = await fetch();
-    await _cache.writeIndex(key, fresh.map((e) => e.toCacheJson()).toList());
-    return (fresh, false);
+    final stopwatch = Stopwatch()..start();
+    final T fresh;
+    try {
+      fresh = await fetch();
+    } catch (_) {
+      onNetwork?.call((latency: null, cacheEntries: _cache.entryCount));
+      rethrow;
+    }
+    stopwatch.stop();
+    await _cache.write(box, key, encode(fresh));
+    onNetwork?.call((
+      latency: stopwatch.elapsed,
+      cacheEntries: _cache.entryCount,
+    ));
+    return (fresh, NetworkFetch(stopwatch.elapsed));
   }
 }

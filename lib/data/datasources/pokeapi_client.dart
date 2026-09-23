@@ -1,8 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../core/constants.dart';
+import '../models/ability.dart';
+import '../models/evolution_chain.dart';
+import '../models/habitat.dart';
 import '../models/pokemon_detail.dart';
 import '../models/pokemon_index_entry.dart';
+import '../models/pokemon_species.dart';
+import '../models/pokemon_type_data.dart';
 
 /// The ONLY place in the app that talks to the network, and it only ever
 /// talks to pokeapi.co, per the assignment's "sole data source" instruction.
@@ -10,86 +15,72 @@ class PokeApiClient {
   final http.Client _http;
   PokeApiClient({http.Client? client}) : _http = client ?? http.Client();
 
-  /// Fetches [limit] Pokemon starting at [offset] and resolves each one's
-  /// full record (needed for types + artwork) via the detail endpoint.
-  /// PokeAPI's /pokemon list endpoint doesn't include types or artwork,
-  /// so we fetch details in parallel for the requested page.
-  Future<List<PokemonDetail>> fetchPokemonPage({
-    required int offset,
-    required int limit,
-  }) async {
-    final listUri = Uri.parse(
-      '${AppConstants.pokeApiBaseUrl}/pokemon?offset=$offset&limit=$limit',
-    );
-    final listRes = await _http.get(listUri);
-    if (listRes.statusCode != 200) {
-      throw PokeApiException(
-        'Failed to load Pokemon list (${listRes.statusCode})',
-      );
-    }
-    final listBody = jsonDecode(listRes.body) as Map<String, dynamic>;
-    final results = (listBody['results'] as List<dynamic>)
-        .cast<Map<String, dynamic>>();
-
-    final details = await Future.wait(
-      results.map((r) => _fetchDetailJson(r['url'] as String)),
-    );
-
-    return details.map(PokemonDetail.fromJson).toList();
-  }
-
   /// Fetches the name + id of every Pokemon in one lightweight request, so
-  /// search can cover the whole catalog without loading every record.
+  /// search and paging can cover the whole catalog without loading every
+  /// record.
   Future<List<PokemonIndexEntry>> fetchPokemonIndex() async {
-    final uri = Uri.parse(
-      '${AppConstants.pokeApiBaseUrl}/pokemon'
-      '?limit=${AppConstants.nameIndexLimit}&offset=0',
+    final body = await _getJson(
+      'pokemon?limit=${AppConstants.nameIndexLimit}&offset=0',
+      'Pokemon index',
     );
-    final res = await _http.get(uri);
-    if (res.statusCode != 200) {
-      throw PokeApiException(
-        'Failed to load Pokemon index (${res.statusCode})',
-      );
-    }
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
     return (body['results'] as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(PokemonIndexEntry.fromResourceJson)
         .toList();
   }
 
-  /// Every Pokemon that has [type], from GET /type/{name}, sorted by id.
-  Future<List<PokemonIndexEntry>> fetchTypeMembers(String type) async {
-    final uri = Uri.parse('${AppConstants.pokeApiBaseUrl}/type/$type');
-    final res = await _http.get(uri);
-    if (res.statusCode != 200) {
-      throw PokeApiException('Failed to load type $type (${res.statusCode})');
-    }
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return (body['pokemon'] as List<dynamic>)
-        .cast<Map<String, dynamic>>()
-        .map(
-          (slot) => PokemonIndexEntry.fromResourceJson(
-            slot['pokemon'] as Map<String, dynamic>,
-          ),
-        )
-        .toList()
-      ..sort((a, b) => a.id.compareTo(b.id));
+  /// GET /type/{name}: the type's members and its damage relations.
+  Future<PokemonTypeData> fetchTypeData(String type) async =>
+      PokemonTypeData.fromJson(await _getJson('type/$type', 'type $type'));
+
+  Future<PokemonDetail> fetchPokemonDetail(int id) async =>
+      PokemonDetail.fromJson(await _getJson('pokemon/$id', 'Pokemon #$id'));
+
+  Future<PokemonSpecies> fetchSpecies(int speciesId) async =>
+      PokemonSpecies.fromJson(
+        await _getJson('pokemon-species/$speciesId', 'species #$speciesId'),
+      );
+
+  Future<EvolutionChain> fetchEvolutionChain(int chainId) async =>
+      EvolutionChain.fromJson(
+        await _getJson('evolution-chain/$chainId', 'evolution chain #$chainId'),
+      );
+
+  /// Names of every habitat (GET /pokemon-habitat).
+  Future<List<String>> fetchHabitatNames() async {
+    final body = await _getJson('pokemon-habitat?limit=100', 'habitats');
+    return [
+      for (final r in body['results'] as List<dynamic>)
+        (r as Map<String, dynamic>)['name'] as String,
+    ];
   }
 
-  Future<PokemonDetail> fetchPokemonDetail(String nameOrId) async {
-    final uri = Uri.parse('${AppConstants.pokeApiBaseUrl}/pokemon/$nameOrId');
-    final res = await _http.get(uri);
-    if (res.statusCode != 200) {
-      throw PokeApiException('Failed to load $nameOrId (${res.statusCode})');
-    }
-    return PokemonDetail.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  Future<PokemonHabitat> fetchHabitat(String name) async =>
+      PokemonHabitat.fromJson(
+        await _getJson('pokemon-habitat/$name', 'habitat $name'),
+      );
+
+  /// Every ability (GET /ability?limit=100000).
+  Future<List<AbilityEntry>> fetchAbilityIndex() async {
+    final body = await _getJson(
+      'ability?limit=${AppConstants.nameIndexLimit}',
+      'abilities',
+    );
+    return [
+      for (final r in body['results'] as List<dynamic>)
+        abilityEntryFromJson(r as Map<String, dynamic>),
+    ];
   }
 
-  Future<Map<String, dynamic>> _fetchDetailJson(String url) async {
-    final res = await _http.get(Uri.parse(url));
+  Future<AbilityDetail> fetchAbility(String name) async =>
+      AbilityDetail.fromJson(await _getJson('ability/$name', 'ability $name'));
+
+  Future<Map<String, dynamic>> _getJson(String path, String what) async {
+    final res = await _http.get(
+      Uri.parse('${AppConstants.pokeApiBaseUrl}/$path'),
+    );
     if (res.statusCode != 200) {
-      throw PokeApiException('Failed to load $url (${res.statusCode})');
+      throw PokeApiException('Failed to load $what (${res.statusCode})');
     }
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
