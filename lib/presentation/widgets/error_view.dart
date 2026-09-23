@@ -50,15 +50,27 @@ class ErrorView extends StatelessWidget {
   }
 }
 
-/// Empty state — shown when a search query matches nothing.
+/// Empty state — shown when a search query and/or type filter matches
+/// nothing.
 class EmptyResultsView extends StatelessWidget {
   final String query;
+  final String? type;
   final VoidCallback onClear;
   const EmptyResultsView({
     super.key,
     required this.query,
     required this.onClear,
+    this.type,
   });
+
+  String get _title {
+    final specimens = type == null
+        ? 'SPECIMENS'
+        : '${type!.toUpperCase()} SPECIMENS';
+    return query.isEmpty
+        ? 'NO $specimens FOUND'
+        : 'NO $specimens MATCH "$query"';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +87,7 @@ class EmptyResultsView extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'NO SPECIMENS FOUND FOR "$query"',
+              _title,
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
@@ -83,7 +95,9 @@ class EmptyResultsView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Try a different name.',
+              type == null
+                  ? 'Try a different name.'
+                  : 'Try a different name or type.',
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: AppTheme.muted),
@@ -92,7 +106,7 @@ class EmptyResultsView extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: onClear,
               icon: const Icon(Icons.close_rounded, size: 16),
-              label: const Text('CLEAR SEARCH'),
+              label: Text(type == null ? 'CLEAR SEARCH' : 'CLEAR FILTERS'),
             ),
           ],
         ),

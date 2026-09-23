@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../data/models/pokemon_summary.dart';
 import '../providers/pokemon_list_provider.dart';
@@ -31,11 +32,7 @@ class PokemonListScreen extends ConsumerWidget {
         : width >= Breakpoints.tablet
         ? 0.88
         : 0.82;
-    final types = switch (status) {
-      ListLoaded(:final items) || ListLoadingMore(:final items) =>
-        items.expand((item) => item.types).toSet().toList()..sort(),
-      _ => const <String>[],
-    };
+    final types = pokemonTypeColors.keys.toList()..sort();
 
     // A failed page waits for an explicit retry instead of auto-retrying.
     final canLoadMore = switch (status) {
@@ -126,23 +123,17 @@ class PokemonListScreen extends ConsumerWidget {
                 ),
                 ListEmpty() => SliverFillRemaining(
                   child: EmptyResultsView(
-                    query: state.query,
-                    onClear: () => notifier.setQuery(''),
+                    query: state.query.trim(),
+                    type: state.selectedType,
+                    onClear: notifier.clearFilters,
                   ),
                 ),
-                ListLoaded(:final items) || ListLoadingMore(:final items) =>
-                  state.visible(items).isEmpty
-                      ? SliverFillRemaining(
-                          child: EmptyResultsView(
-                            query: state.query,
-                            onClear: () => notifier.setQuery(''),
-                          ),
-                        )
-                      : _PokemonGrid(
-                          items: state.visible(items),
-                          columns: columns,
-                          aspectRatio: cardAspectRatio,
-                        ),
+                ListLoaded(:final items) ||
+                ListLoadingMore(:final items) => _PokemonGrid(
+                  items: items,
+                  columns: columns,
+                  aspectRatio: cardAspectRatio,
+                ),
               },
             ),
             SliverToBoxAdapter(

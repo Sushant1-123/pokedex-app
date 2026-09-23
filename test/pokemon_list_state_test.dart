@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokedex_app/data/models/pokemon_index_entry.dart';
-import 'package:pokedex_app/data/models/pokemon_summary.dart';
 import 'package:pokedex_app/presentation/providers/pokemon_list_provider.dart';
 
 void main() {
@@ -20,26 +19,14 @@ void main() {
     expect(searchPokemonIndex(index, 'missing'), isEmpty);
   });
 
-  test('narrows loaded summaries by the selected type', () {
-    const items = [
-      PokemonSummary(
-        id: 1,
-        name: 'bulbasaur',
-        imageUrl: 'bulbasaur.png',
-        types: ['grass', 'poison'],
-      ),
-      PokemonSummary(
-        id: 4,
-        name: 'charmander',
-        imageUrl: 'charmander.png',
-        types: ['fire'],
-      ),
-    ];
-    const state = PokemonListState(
+  test('a whitespace-only query does not count as a filter', () {
+    const blank = PokemonListState(status: ListInitialLoading(), query: '  ');
+    const typed = PokemonListState(
       status: ListInitialLoading(),
       selectedType: 'fire',
     );
 
-    expect(state.visible(items).map((pokemon) => pokemon.name), ['charmander']);
+    expect(blank.isFiltered, isFalse);
+    expect(typed.isFiltered, isTrue);
   });
 }

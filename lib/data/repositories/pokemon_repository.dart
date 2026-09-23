@@ -11,6 +11,7 @@ class PokemonRepository {
   final PokemonCache _cache;
 
   static const catalogIndexKey = 'all';
+  static String typeIndexKey(String type) => 'type:$type';
 
   PokemonRepository({
     required PokeApiClient client,
@@ -64,20 +65,13 @@ class PokemonRepository {
   }
 
   /// Name + id of every Pokemon, used to search beyond the loaded pages.
-  Future<(List<PokemonIndexEntry> entries, bool fromCache)>
-  getPokemonIndex() async {
-    final cached = _cache.readIndex(catalogIndexKey);
-    if (cached != null) {
-      return (_indexFromCache(cached), true);
-    }
+  Future<(List<PokemonIndexEntry> entries, bool fromCache)> getPokemonIndex() =>
+      _getIndex(catalogIndexKey, _client.fetchPokemonIndex);
 
-    final fresh = await _client.fetchPokemonIndex();
-    await _cache.writeIndex(
-      catalogIndexKey,
-      fresh.map((e) => e.toCacheJson()).toList(),
-    );
-    return (fresh, false);
-  }
+  /// Name + id of every Pokemon of [type], across the whole catalog.
+  Future<(List<PokemonIndexEntry> entries, bool fromCache)> getTypeMembers(
+    String type,
+  ) => _getIndex(typeIndexKey(type), () => _client.fetchTypeMembers(type));
 
   Future<(PokemonDetail detail, bool fromCache)> getPokemonDetail(
     String nameOrId,
@@ -92,8 +86,21 @@ class PokemonRepository {
     return (fresh, false);
   }
 
-  List<PokemonIndexEntry> _indexFromCache(List<dynamic> cached) => cached
-      .cast<Map<String, dynamic>>()
-      .map(PokemonIndexEntry.fromCacheJson)
-      .toList();
+  Future<(List<PokemonIndexEntry> entries, bool fromCache)> _getIndex(
+    String key,
+    Future<List<PokemonIndexEntry>> Function() fetch,
+  ) async {
+    final cached = _cache.readIndex(key);
+    if (cached != null) {
+      final entries = cached
+          .cast<Map<String, dynamic>>()
+          .map(PokemonIndexEntry.fromCacheJson)
+          .toList();
+      return (entries, true);
+    }
+
+    final fresh = await fetch();
+    await _cache.writeIndex(key, fresh.map((e) => e.toCacheJson()).toList());
+    return (fresh, false);
+  }
 }

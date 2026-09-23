@@ -58,6 +58,25 @@ class PokeApiClient {
         .toList();
   }
 
+  /// Every Pokemon that has [type], from GET /type/{name}, sorted by id.
+  Future<List<PokemonIndexEntry>> fetchTypeMembers(String type) async {
+    final uri = Uri.parse('${AppConstants.pokeApiBaseUrl}/type/$type');
+    final res = await _http.get(uri);
+    if (res.statusCode != 200) {
+      throw PokeApiException('Failed to load type $type (${res.statusCode})');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return (body['pokemon'] as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(
+          (slot) => PokemonIndexEntry.fromResourceJson(
+            slot['pokemon'] as Map<String, dynamic>,
+          ),
+        )
+        .toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+  }
+
   Future<PokemonDetail> fetchPokemonDetail(String nameOrId) async {
     final uri = Uri.parse('${AppConstants.pokeApiBaseUrl}/pokemon/$nameOrId');
     final res = await _http.get(uri);

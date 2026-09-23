@@ -74,11 +74,8 @@ class PokemonListState {
 
   bool get hasQuery => query.trim().isNotEmpty;
 
-  /// Narrows loaded [items] by the selected type.
-  List<PokemonSummary> visible(List<PokemonSummary> items) {
-    if (selectedType == null) return items;
-    return items.where((p) => p.types.contains(selectedType)).toList();
-  }
+  /// True when the list shows search/type matches rather than the catalog.
+  bool get isFiltered => hasQuery || selectedType != null;
 }
 
 /// Case-insensitive name `contains` match over the name index. A numeric
@@ -99,7 +96,7 @@ typedef _Page = ({List<PokemonSummary> items, bool hasMore});
 
 /// Riverpod `NotifierProvider` (as required by the brief) managing the
 /// Pokemon list: the paginated catalog, debounced search across the full
-/// name index, infinite scroll and refresh.
+/// name index, the type filter, infinite scroll and refresh.
 class PokemonListNotifier extends Notifier<PokemonListState> {
   Timer? _debounce;
 
@@ -108,12 +105,12 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
   /// newer one.
   int _generation = 0;
 
-  /// Index entries matching the active search, or null while browsing the
-  /// catalog page by page.
+  /// Index entries matching the active search/type filter, or null while
+  /// browsing the catalog page by page.
   List<PokemonIndexEntry>? _matches;
 
-  /// Last loaded catalog, restored as-is when the search is cleared so the
-  /// paginated list comes back without refetching.
+  /// Last loaded catalog, restored as-is when the filters are cleared so
+  /// the paginated list comes back without refetching.
   ListLoaded? _catalog;
 
   @override
@@ -125,7 +122,7 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
   }
 
   /// Updates the query right away (so the field stays in sync) and searches
-  /// once typing pauses. Clearing it restores the catalog immediately.
+  /// once typing pauses. Clearing it reloads immediately.
   void setQuery(String query) {
     if (query == state.query) return;
     state = state.copyWith(query: query);
@@ -138,7 +135,16 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
   }
 
   void setType(String? type) {
+    if (type == state.selectedType) return;
+    _debounce?.cancel();
     state = state.copyWith(selectedType: type);
+    _reload();
+  }
+
+  void clearFilters() {
+    _debounce?.cancel();
+    state = state.copyWith(query: '', selectedType: null);
+    _reload();
   }
 
   /// Drops the cached catalog snapshot and reloads the current view.
@@ -169,14 +175,15 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
     }
   }
 
-  /// Loads the first page for the current query. Anything that changes what
-  /// the list shows goes through here, and bumps [_generation].
+  /// Loads the first page for the current query and type. Anything that
+  /// changes what the list shows goes through here, and bumps [_generation].
   Future<void> _reload() async {
     final generation = ++_generation;
     final query = state.query;
-    final searching = state.hasQuery;
+    final type = state.selectedType;
+    final filtered = state.isFiltered;
 
-    if (!searching) {
+    if (!filtered) {
       _matches = null;
       final catalog = _catalog;
       if (catalog != null) {
@@ -187,12 +194,10 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
 
     state = state.copyWith(status: const ListInitialLoading());
     try {
-      if (searching) {
-        final (index, _) = await ref
-            .read(pokemonRepositoryProvider)
-            .getPokemonIndex();
+      if (filtered) {
+        final matches = await _findMatches(query, type);
         if (generation != _generation) return;
-        _matches = searchPokemonIndex(index, query);
+        _matches = matches;
       }
       final page = await _fetchPage(0);
       if (generation != _generation) return;
@@ -207,7 +212,20 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
     }
   }
 
-  /// Next page of either the catalog or the current search matches.
+  /// Without a type this searches the full name index; with one it searches
+  /// that type's members from /type/{name}, i.e. the intersection of both.
+  Future<List<PokemonIndexEntry>> _findMatches(
+    String query,
+    String? type,
+  ) async {
+    final repository = ref.read(pokemonRepositoryProvider);
+    final (candidates, _) = type == null
+        ? await repository.getPokemonIndex()
+        : await repository.getTypeMembers(type);
+    return searchPokemonIndex(candidates, query);
+  }
+
+  /// Next page of either the catalog or the current matches.
   Future<_Page> _fetchPage(int offset) async {
     final repository = ref.read(pokemonRepositoryProvider);
     final matches = _matches;
