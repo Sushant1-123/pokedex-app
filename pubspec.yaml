@@ -30,6 +30,9 @@ dependencies:
   # Path for Hive box storage on native platforms
   path_provider: ^2.1.4
 
+  # Pokemon cries (cries.latest / cries.legacy URLs from /pokemon)
+  audioplayers: ^6.8.1
+
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
@@ -41,3 +44,23 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/fonts/OFL.txt
+    - assets/images/intro/trainer.webp
+
+  # Plus Jakarta Sans (SIL OFL 1.1, see assets/fonts/OFL.txt), bundled so no
+  # font is fetched at runtime.
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSans-ExtraBold.ttf
+          weight: 800
