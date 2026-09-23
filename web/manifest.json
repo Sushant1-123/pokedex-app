@@ -1,11 +1,11 @@
 {
-    "name": "pokedex_app",
-    "short_name": "pokedex_app",
+    "name": "Pokedex",
+    "short_name": "Pokedex",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0B0E0B",
+    "theme_color": "#0B0E0B",
+    "description": "A research-grade field Pokedex built with Flutter, Riverpod and PokeAPI.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
