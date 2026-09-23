@@ -62,8 +62,6 @@ class AppTheme {
       ),
     );
   }
-
-  static ThemeData light() => dark();
 }
 
 /// Simple responsive breakpoints used to switch grid column counts.
@@ -71,7 +69,6 @@ class Breakpoints {
   Breakpoints._();
   static const double tablet = 700;
   static const double desktop = 1100;
-  static const double wideDesktop = 1440;
 
   static int columnsFor(double width) {
     if (width >= desktop) return 5;

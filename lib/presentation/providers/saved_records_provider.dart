@@ -43,14 +43,6 @@ class SavedRecordsNotifier extends Notifier<Result<List<PokemonSummary>>> {
     await ref.read(pokemonCacheProvider).deleteSavedRecord(pokemon.id);
     load();
   }
-
-  bool contains(int id) {
-    final records = switch (state) {
-      Success<List<PokemonSummary>>(data: final value) => value,
-      _ => const <PokemonSummary>[],
-    };
-    return records.any((record) => record.id == id);
-  }
 }
 
 final savedRecordsProvider =

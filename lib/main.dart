@@ -36,9 +36,7 @@ class PokedexApp extends StatelessWidget {
     return MaterialApp(
       title: 'Pokedex',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.dark,
+      theme: AppTheme.dark(),
       initialRoute: AppDestination.specimenIndex.path,
       onGenerateRoute: (settings) {
         final destination = AppDestination.fromPath(settings.name);

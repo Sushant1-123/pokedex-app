@@ -19,17 +19,3 @@ class Failure<T> extends Result<T> {
   final String message;
   const Failure(this.message);
 }
-
-extension ResultMatch<T> on Result<T> {
-  R when<R>({
-    required R Function() loading,
-    required R Function(T data, bool fromCache) success,
-    required R Function(String message) failure,
-  }) {
-    return switch (this) {
-      Loading<T>() => loading(),
-      Success<T>(data: final d, fromCache: final c) => success(d, c),
-      Failure<T>(message: final m) => failure(m),
-    };
-  }
-}

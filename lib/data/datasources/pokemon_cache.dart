@@ -81,9 +81,4 @@ class PokemonCache {
     final cachedAt = DateTime.fromMillisecondsSinceEpoch(cachedAtMillis);
     return DateTime.now().difference(cachedAt) > AppConstants.cacheTtl;
   }
-
-  Future<void> clearAll() async {
-    await _listBox.clear();
-    await _detailBox.clear();
-  }
 }
