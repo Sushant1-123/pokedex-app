@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'core/theme.dart';
 import 'data/datasources/pokemon_cache.dart';
@@ -15,6 +16,7 @@ Future<void> main() async {
 
   // Open the persistent (Hive) cache once, before the app starts, so every
   // screen can read/write it synchronously through the repository.
+  await Hive.initFlutter();
   final cache = PokemonCache();
   await cache.init();
 

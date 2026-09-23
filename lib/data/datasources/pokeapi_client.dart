@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../../core/constants.dart';
 import '../models/pokemon_summary.dart';
 import '../models/pokemon_detail.dart';
+import '../models/pokemon_index_entry.dart';
 
 /// The ONLY place in the app that talks to the network, and it only ever
 /// talks to pokeapi.co, per the assignment's "sole data source" instruction.
@@ -27,8 +28,8 @@ class PokeApiClient {
           'Failed to load Pokemon list (${listRes.statusCode})');
     }
     final listBody = jsonDecode(listRes.body) as Map<String, dynamic>;
-    final results = (listBody['results'] as List<dynamic>)
-        .cast<Map<String, dynamic>>();
+    final results =
+        (listBody['results'] as List<dynamic>).cast<Map<String, dynamic>>();
 
     final details = await Future.wait(
       results.map((r) => _fetchDetailJson(r['url'] as String)),
@@ -37,13 +38,30 @@ class PokeApiClient {
     return details.map(PokemonSummary.fromDetailJson).toList();
   }
 
-  Future<PokemonDetail> fetchPokemonDetail(String nameOrId) async {
-    final uri =
-        Uri.parse('${AppConstants.pokeApiBaseUrl}/pokemon/$nameOrId');
+  /// Fetches the name + id of every Pokemon in one lightweight request, so
+  /// search can cover the whole catalog without loading every record.
+  Future<List<PokemonIndexEntry>> fetchPokemonIndex() async {
+    final uri = Uri.parse(
+      '${AppConstants.pokeApiBaseUrl}/pokemon'
+      '?limit=${AppConstants.nameIndexLimit}&offset=0',
+    );
     final res = await _http.get(uri);
     if (res.statusCode != 200) {
       throw PokeApiException(
-          'Failed to load $nameOrId (${res.statusCode})');
+          'Failed to load Pokemon index (${res.statusCode})');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return (body['results'] as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(PokemonIndexEntry.fromResourceJson)
+        .toList();
+  }
+
+  Future<PokemonDetail> fetchPokemonDetail(String nameOrId) async {
+    final uri = Uri.parse('${AppConstants.pokeApiBaseUrl}/pokemon/$nameOrId');
+    final res = await _http.get(uri);
+    if (res.statusCode != 200) {
+      throw PokeApiException('Failed to load $nameOrId (${res.statusCode})');
     }
     return PokemonDetail.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }

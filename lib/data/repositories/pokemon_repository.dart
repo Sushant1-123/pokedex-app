@@ -2,12 +2,15 @@ import '../datasources/pokeapi_client.dart';
 import '../datasources/pokemon_cache.dart';
 import '../models/pokemon_summary.dart';
 import '../models/pokemon_detail.dart';
+import '../models/pokemon_index_entry.dart';
 
 /// The repository is the only thing the presentation layer talks to.
 /// It decides cache-vs-network so screens/providers stay free of that logic.
 class PokemonRepository {
   final PokeApiClient _client;
   final PokemonCache _cache;
+
+  static const catalogIndexKey = 'all';
 
   PokemonRepository({
     required PokeApiClient client,
@@ -37,6 +40,22 @@ class PokemonRepository {
     return (fresh, false);
   }
 
+  /// Name + id of every Pokemon, used to search beyond the loaded pages.
+  Future<(List<PokemonIndexEntry> entries, bool fromCache)>
+      getPokemonIndex() async {
+    final cached = _cache.readIndex(catalogIndexKey);
+    if (cached != null) {
+      return (_indexFromCache(cached), true);
+    }
+
+    final fresh = await _client.fetchPokemonIndex();
+    await _cache.writeIndex(
+      catalogIndexKey,
+      fresh.map((e) => e.toCacheJson()).toList(),
+    );
+    return (fresh, false);
+  }
+
   Future<(PokemonDetail detail, bool fromCache)> getPokemonDetail(
     String nameOrId,
   ) async {
@@ -49,4 +68,9 @@ class PokemonRepository {
     await _cache.writeDetail(nameOrId, fresh.toCacheJson());
     return (fresh, false);
   }
+
+  List<PokemonIndexEntry> _indexFromCache(List<dynamic> cached) => cached
+      .cast<Map<String, dynamic>>()
+      .map(PokemonIndexEntry.fromCacheJson)
+      .toList();
 }

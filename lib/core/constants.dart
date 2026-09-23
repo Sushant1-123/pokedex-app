@@ -13,8 +13,12 @@ class AppConstants {
   /// How many Pokemon to request per page from PokeAPI's list endpoint.
   static const int pageSize = 40;
 
+  /// Large enough to return every Pokemon in one request for the name index.
+  static const int nameIndexLimit = 100000;
+
   static const String pokemonListBoxName = 'pokemon_list_cache';
   static const String pokemonDetailBoxName = 'pokemon_detail_cache';
+  static const String pokemonIndexBoxName = 'pokemon_index_cache';
   static const String savedRecordsBoxName = 'saved_pokemon_records';
 }
 
