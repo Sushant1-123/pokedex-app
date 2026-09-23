@@ -15,6 +15,15 @@ void main() {
     expect(searchPokemonIndex(index, '  Wake ').map((e) => e.id), [1009]);
   });
 
+  test('matches an exact id, with or without #', () {
+    expect(searchPokemonIndex(index, '25').map((e) => e.name), ['pikachu']);
+    expect(searchPokemonIndex(index, '#025').map((e) => e.name), ['pikachu']);
+  });
+
+  test('an empty query keeps the whole index', () {
+    expect(searchPokemonIndex(index, '   '), hasLength(index.length));
+  });
+
   test('returns no index entries for an unmatched query', () {
     expect(searchPokemonIndex(index, 'missing'), isEmpty);
   });
