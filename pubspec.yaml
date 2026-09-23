@@ -1,0 +1,43 @@
+name: pokedex_app
+description: A cross-platform Pokedex built with Flutter, Riverpod, and PokeAPI.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+
+  # State management — NotifierProvider per assignment requirement
+  flutter_riverpod: ^2.5.1
+
+  # Networking
+  http: ^1.2.2
+
+  # Persistent cache (1h TTL) — chosen over drift/isar for lower boilerplate
+  # at this scope while still being a real persistent, cross-platform store.
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Loading skeletons
+  shimmer: ^3.0.0
+
+  # Path for Hive box storage on native platforms
+  path_provider: ^2.1.4
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.13
+  hive_generator: ^2.0.1
+
+flutter:
+  uses-material-design: true
