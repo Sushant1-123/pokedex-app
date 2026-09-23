@@ -29,5 +29,5 @@ class AppNavigationNotifier extends Notifier<AppDestination> {
 
 final appNavigationProvider =
     NotifierProvider<AppNavigationNotifier, AppDestination>(
-  AppNavigationNotifier.new,
-);
+      AppNavigationNotifier.new,
+    );

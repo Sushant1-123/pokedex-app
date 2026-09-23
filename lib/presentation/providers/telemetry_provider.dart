@@ -34,11 +34,11 @@ class TelemetryData {
     final averageHeight = details.isEmpty
         ? 0.0
         : details.map((detail) => detail.heightM).reduce((a, b) => a + b) /
-            details.length;
+              details.length;
     final averageWeight = details.isEmpty
         ? 0.0
         : details.map((detail) => detail.weightKg).reduce((a, b) => a + b) /
-            details.length;
+              details.length;
 
     final statTotals = <String, int>{};
     final statCounts = <String, int>{};
@@ -112,5 +112,5 @@ class TelemetryNotifier extends Notifier<Result<TelemetryData>> {
 
 final telemetryProvider =
     NotifierProvider<TelemetryNotifier, Result<TelemetryData>>(
-  TelemetryNotifier.new,
-);
+      TelemetryNotifier.new,
+    );

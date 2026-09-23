@@ -35,7 +35,7 @@ void main() {
 
 class _TestPokemonRepository extends PokemonRepository {
   _TestPokemonRepository()
-      : super(client: PokeApiClient(), cache: PokemonCache());
+    : super(client: PokeApiClient(), cache: PokemonCache());
 
   @override
   Future<(List<PokemonSummary> items, bool fromCache)> getPokemonPage({

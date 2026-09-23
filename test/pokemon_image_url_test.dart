@@ -6,14 +6,17 @@ import 'package:pokedex_app/data/models/pokemon_summary.dart';
 void main() {
   const ids = [1, 4, 5, 6, 7, 25, 150];
 
-  test('uses the canonical HTTPS official artwork URL for every requested ID', () {
-    for (final id in ids) {
-      expect(
-        pokemonArtworkUrl(id),
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/$id.png',
-      );
-    }
-  });
+  test(
+    'uses the canonical HTTPS official artwork URL for every requested ID',
+    () {
+      for (final id in ids) {
+        expect(
+          pokemonArtworkUrl(id),
+          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/$id.png',
+        );
+      }
+    },
+  );
 
   test('model parsers keep cached and API image URLs canonical', () {
     for (final id in ids) {
@@ -31,28 +34,28 @@ void main() {
 }
 
 Map<String, dynamic> _summaryJson(int id) => {
-      'id': id,
-      'name': 'pokemon-$id',
-      'types': [
-        {
-          'type': {'name': 'normal'},
-        },
-      ],
-    };
+  'id': id,
+  'name': 'pokemon-$id',
+  'types': [
+    {
+      'type': {'name': 'normal'},
+    },
+  ],
+};
 
 Map<String, dynamic> _detailJson(int id) => {
-      ..._summaryJson(id),
-      'height': 10,
-      'weight': 100,
-      'stats': [
-        {
-          'stat': {'name': 'hp'},
-          'base_stat': 50,
-        },
-      ],
-      'abilities': [
-        {
-          'ability': {'name': 'run-away'},
-        },
-      ],
-    };
+  ..._summaryJson(id),
+  'height': 10,
+  'weight': 100,
+  'stats': [
+    {
+      'stat': {'name': 'hp'},
+      'base_stat': 50,
+    },
+  ],
+  'abilities': [
+    {
+      'ability': {'name': 'run-away'},
+    },
+  ],
+};

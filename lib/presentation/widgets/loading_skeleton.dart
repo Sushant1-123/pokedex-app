@@ -26,14 +26,15 @@ class PokemonListSkeleton extends StatelessWidget {
           childAspectRatio: width >= Breakpoints.desktop
               ? 0.94
               : width >= Breakpoints.tablet
-                  ? 0.88
-                  : 0.82,
+              ? 0.88
+              : 0.82,
         ),
         itemBuilder: (context, index) => Container(
           decoration: BoxDecoration(
-              color: AppTheme.panel,
-              border: Border.all(color: AppTheme.line),
-              borderRadius: BorderRadius.circular(4)),
+            color: AppTheme.panel,
+            border: Border.all(color: AppTheme.line),
+            borderRadius: BorderRadius.circular(4),
+          ),
         ),
       ),
     );

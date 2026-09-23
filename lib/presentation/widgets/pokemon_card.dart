@@ -34,17 +34,23 @@ class PokemonCard extends StatelessWidget {
                 Row(
                   children: [
                     const Expanded(
-                      child: Text('FIELD SAMPLE',
-                          style: TextStyle(
-                              fontSize: 9,
-                              color: AppTheme.muted,
-                              letterSpacing: 1)),
-                    ),
-                    Text('#${pokemon.id.toString().padLeft(3, '0')}',
+                      child: Text(
+                        'FIELD SAMPLE',
                         style: TextStyle(
-                            fontSize: 12,
-                            color: accent,
-                            fontWeight: FontWeight.w700)),
+                          fontSize: 9,
+                          color: AppTheme.muted,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '#${pokemon.id.toString().padLeft(3, '0')}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: accent,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     SavedRecordButton(pokemon: pokemon, color: accent),
                   ],
                 ),
@@ -61,9 +67,10 @@ class PokemonCard extends StatelessWidget {
                 Text(
                   _capitalize(pokemon.name),
                   style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: AppTheme.paper),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: AppTheme.paper,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
@@ -100,12 +107,15 @@ class _TypeLabel extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.5)),
         borderRadius: BorderRadius.circular(2),
       ),
-      child: Text(type.toUpperCase(),
-          style: TextStyle(
-              color: color,
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.4)),
+      child: Text(
+        type.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+        ),
+      ),
     );
   }
 }

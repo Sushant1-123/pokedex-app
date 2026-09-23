@@ -55,40 +55,56 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        height: 66,
-        padding: const EdgeInsets.symmetric(horizontal: 18),
-        decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppTheme.line))),
-        child: Row(children: [
-          const Icon(Icons.change_history_rounded,
-              color: AppTheme.signal, size: 20),
-          const SizedBox(width: 12),
-          const Text('POKÉDEX',
-              style: TextStyle(
-                  color: AppTheme.paper,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2)),
-          const SizedBox(width: 10),
-          Container(
-              width: 6,
-              height: 6,
-              decoration: const BoxDecoration(
-                  color: AppTheme.signal, shape: BoxShape.circle)),
-          const SizedBox(width: 6),
-          const Text('ONLINE',
-              style: TextStyle(
-                  color: AppTheme.signal,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1)),
-          const Spacer(),
-          if (onRefresh != null)
-            IconButton(
-                onPressed: onRefresh,
-                tooltip: 'Refresh specimen index',
-                icon: const Icon(Icons.sync_rounded, color: AppTheme.muted)),
-        ]),
-      );
+    height: 66,
+    padding: const EdgeInsets.symmetric(horizontal: 18),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: AppTheme.line)),
+    ),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.change_history_rounded,
+          color: AppTheme.signal,
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        const Text(
+          'POKÉDEX',
+          style: TextStyle(
+            color: AppTheme.paper,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 2,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          width: 6,
+          height: 6,
+          decoration: const BoxDecoration(
+            color: AppTheme.signal,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          'ONLINE',
+          style: TextStyle(
+            color: AppTheme.signal,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
+          ),
+        ),
+        const Spacer(),
+        if (onRefresh != null)
+          IconButton(
+            onPressed: onRefresh,
+            tooltip: 'Refresh specimen index',
+            icon: const Icon(Icons.sync_rounded, color: AppTheme.muted),
+          ),
+      ],
+    ),
+  );
 }
 
 class _FieldSidebar extends ConsumerWidget {
@@ -97,41 +113,57 @@ class _FieldSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Container(
-        width: 220,
-        decoration: const BoxDecoration(
-            border: Border(right: BorderSide(color: AppTheme.line))),
-        padding: const EdgeInsets.fromLTRB(22, 88, 18, 24),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('FIELD TOOLS',
-              style: TextStyle(
-                  color: AppTheme.muted, fontSize: 10, letterSpacing: 1.5)),
-          const SizedBox(height: 22),
-          _NavItem(
-              icon: Icons.grid_view_rounded,
-              label: AppDestination.specimenIndex.label,
-              active: active == AppDestination.specimenIndex,
-              onTap: () => navigateToDestination(
-                  context, ref, AppDestination.specimenIndex)),
-          _NavItem(
-              icon: Icons.bar_chart_rounded,
-              label: AppDestination.telemetry.label,
-              active: active == AppDestination.telemetry,
-              onTap: () => navigateToDestination(
-                  context, ref, AppDestination.telemetry)),
-          _NavItem(
-              icon: Icons.bookmark_border_rounded,
-              label: AppDestination.saved.label,
-              active: active == AppDestination.saved,
-              onTap: () =>
-                  navigateToDestination(context, ref, AppDestination.saved)),
-          const Spacer(),
-          const Text('API / POKEAPI',
-              style: TextStyle(color: AppTheme.muted, fontSize: 10)),
-          const SizedBox(height: 8),
-          const Text('SYNC STATUS  100%',
-              style: TextStyle(color: AppTheme.signal, fontSize: 10)),
-        ]),
-      );
+    width: 220,
+    decoration: const BoxDecoration(
+      border: Border(right: BorderSide(color: AppTheme.line)),
+    ),
+    padding: const EdgeInsets.fromLTRB(22, 88, 18, 24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'FIELD TOOLS',
+          style: TextStyle(
+            color: AppTheme.muted,
+            fontSize: 10,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 22),
+        _NavItem(
+          icon: Icons.grid_view_rounded,
+          label: AppDestination.specimenIndex.label,
+          active: active == AppDestination.specimenIndex,
+          onTap: () =>
+              navigateToDestination(context, ref, AppDestination.specimenIndex),
+        ),
+        _NavItem(
+          icon: Icons.bar_chart_rounded,
+          label: AppDestination.telemetry.label,
+          active: active == AppDestination.telemetry,
+          onTap: () =>
+              navigateToDestination(context, ref, AppDestination.telemetry),
+        ),
+        _NavItem(
+          icon: Icons.bookmark_border_rounded,
+          label: AppDestination.saved.label,
+          active: active == AppDestination.saved,
+          onTap: () =>
+              navigateToDestination(context, ref, AppDestination.saved),
+        ),
+        const Spacer(),
+        const Text(
+          'API / POKEAPI',
+          style: TextStyle(color: AppTheme.muted, fontSize: 10),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'SYNC STATUS  100%',
+          style: TextStyle(color: AppTheme.signal, fontSize: 10),
+        ),
+      ],
+    ),
+  );
 }
 
 class _NavItem extends StatelessWidget {
@@ -149,27 +181,35 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 18),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(3),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(children: [
-              Icon(icon,
-                  size: 18, color: active ? AppTheme.signal : AppTheme.muted),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(label,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: active ? AppTheme.paper : AppTheme.muted,
-                        fontSize: 12)),
-              )
-            ]),
-          ),
+    padding: const EdgeInsets.only(bottom: 18),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(3),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: active ? AppTheme.signal : AppTheme.muted,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: active ? AppTheme.paper : AppTheme.muted,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _MobileNav extends ConsumerWidget {
@@ -178,27 +218,34 @@ class _MobileNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Container(
-        height: 58,
-        decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: AppTheme.line))),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-          _MobileNavItem(
-              icon: Icons.grid_view_rounded,
-              active: active == AppDestination.specimenIndex,
-              onTap: () => navigateToDestination(
-                  context, ref, AppDestination.specimenIndex)),
-          _MobileNavItem(
-              icon: Icons.bar_chart_rounded,
-              active: active == AppDestination.telemetry,
-              onTap: () => navigateToDestination(
-                  context, ref, AppDestination.telemetry)),
-          _MobileNavItem(
-              icon: Icons.bookmark_border_rounded,
-              active: active == AppDestination.saved,
-              onTap: () =>
-                  navigateToDestination(context, ref, AppDestination.saved)),
-        ]),
-      );
+    height: 58,
+    decoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: AppTheme.line)),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        _MobileNavItem(
+          icon: Icons.grid_view_rounded,
+          active: active == AppDestination.specimenIndex,
+          onTap: () =>
+              navigateToDestination(context, ref, AppDestination.specimenIndex),
+        ),
+        _MobileNavItem(
+          icon: Icons.bar_chart_rounded,
+          active: active == AppDestination.telemetry,
+          onTap: () =>
+              navigateToDestination(context, ref, AppDestination.telemetry),
+        ),
+        _MobileNavItem(
+          icon: Icons.bookmark_border_rounded,
+          active: active == AppDestination.saved,
+          onTap: () =>
+              navigateToDestination(context, ref, AppDestination.saved),
+        ),
+      ],
+    ),
+  );
 }
 
 class _MobileNavItem extends StatelessWidget {
@@ -214,8 +261,8 @@ class _MobileNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => IconButton(
-        onPressed: onTap,
-        tooltip: active ? 'Current section' : null,
-        icon: Icon(icon, color: active ? AppTheme.signal : AppTheme.muted),
-      );
+    onPressed: onTap,
+    tooltip: active ? 'Current section' : null,
+    icon: Icon(icon, color: active ? AppTheme.signal : AppTheme.muted),
+  );
 }

@@ -75,38 +75,41 @@ void main() {
     expect(telemetry.averageBaseStats['hp'], closeTo(42, 0.001));
   });
 
-  test('saved records can be added, removed, and loaded by a new container',
-      () async {
-    final cache = _FakePokemonCache();
-    const pokemon = PokemonSummary(
-      id: 25,
-      name: 'pikachu',
-      imageUrl: 'pikachu.png',
-      types: ['electric'],
-    );
+  test(
+    'saved records can be added, removed, and loaded by a new container',
+    () async {
+      final cache = _FakePokemonCache();
+      const pokemon = PokemonSummary(
+        id: 25,
+        name: 'pikachu',
+        imageUrl: 'pikachu.png',
+        types: ['electric'],
+      );
 
-    final first = ProviderContainer(
-      overrides: [pokemonCacheProvider.overrideWithValue(cache)],
-    );
-    addTearDown(first.dispose);
-    first.read(savedRecordsProvider.notifier).load();
-    await first.read(savedRecordsProvider.notifier).toggle(pokemon);
+      final first = ProviderContainer(
+        overrides: [pokemonCacheProvider.overrideWithValue(cache)],
+      );
+      addTearDown(first.dispose);
+      first.read(savedRecordsProvider.notifier).load();
+      await first.read(savedRecordsProvider.notifier).toggle(pokemon);
 
-    expect(_saved(first).map((record) => record.id), [pokemon.id]);
+      expect(_saved(first).map((record) => record.id), [pokemon.id]);
 
-    final second = ProviderContainer(
-      overrides: [pokemonCacheProvider.overrideWithValue(cache)],
-    );
-    addTearDown(second.dispose);
-    second.read(savedRecordsProvider.notifier).load();
-    expect(_saved(second).map((record) => record.id), [pokemon.id]);
+      final second = ProviderContainer(
+        overrides: [pokemonCacheProvider.overrideWithValue(cache)],
+      );
+      addTearDown(second.dispose);
+      second.read(savedRecordsProvider.notifier).load();
+      expect(_saved(second).map((record) => record.id), [pokemon.id]);
 
-    await second.read(savedRecordsProvider.notifier).remove(pokemon);
-    expect(_saved(second), isEmpty);
-  });
+      await second.read(savedRecordsProvider.notifier).remove(pokemon);
+      expect(_saved(second), isEmpty);
+    },
+  );
 
-  testWidgets('desktop navigation opens telemetry and saved records',
-      (tester) async {
+  testWidgets('desktop navigation opens telemetry and saved records', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -142,8 +145,9 @@ void main() {
     expect(find.text('TELEMETRY'), findsOneWidget);
   });
 
-  testWidgets('saved records starts with a designed empty state',
-      (tester) async {
+  testWidgets('saved records starts with a designed empty state', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -171,17 +175,17 @@ class _AppHarness extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ProviderScope(
-        overrides: [
-          pokemonCacheProvider.overrideWithValue(cache),
-          pokemonRepositoryProvider.overrideWithValue(_FakeRepository()),
-        ],
-        child: const PokedexApp(),
-      );
+    overrides: [
+      pokemonCacheProvider.overrideWithValue(cache),
+      pokemonRepositoryProvider.overrideWithValue(_FakeRepository()),
+    ],
+    child: const PokedexApp(),
+  );
 }
 
 class _FakeRepository extends PokemonRepository {
   _FakeRepository()
-      : super(client: PokeApiClient(), cache: _FakePokemonCache());
+    : super(client: PokeApiClient(), cache: _FakePokemonCache());
 
   @override
   Future<(List<PokemonSummary> items, bool fromCache)> getPokemonPage({

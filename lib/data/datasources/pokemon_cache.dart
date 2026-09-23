@@ -34,7 +34,9 @@ class PokemonCache {
   }
 
   Future<void> writeListPage(
-      String key, List<Map<String, dynamic>> items) async {
+    String key,
+    List<Map<String, dynamic>> items,
+  ) async {
     await _writeFresh(_listBox, key, {'items': items});
   }
 
@@ -55,7 +57,9 @@ class PokemonCache {
   }
 
   Future<void> writeIndex(
-      String key, List<Map<String, dynamic>> entries) async {
+    String key,
+    List<Map<String, dynamic>> entries,
+  ) async {
     await _writeFresh(_indexBox, key, {'entries': entries});
   }
 
@@ -79,8 +83,9 @@ class PokemonCache {
     final raw = box.get(key);
     if (raw == null) return null;
     final envelope = jsonDecode(raw) as Map<String, dynamic>;
-    final cachedAt =
-        DateTime.fromMillisecondsSinceEpoch(envelope['cachedAt'] as int);
+    final cachedAt = DateTime.fromMillisecondsSinceEpoch(
+      envelope['cachedAt'] as int,
+    );
     if (_now().difference(cachedAt) > AppConstants.cacheTtl) {
       box.delete(key);
       return null;
@@ -89,11 +94,11 @@ class PokemonCache {
   }
 
   Future<void> _writeFresh(
-      Box<String> box, String key, Map<String, dynamic> payload) async {
-    final envelope = {
-      'cachedAt': _now().millisecondsSinceEpoch,
-      ...payload,
-    };
+    Box<String> box,
+    String key,
+    Map<String, dynamic> payload,
+  ) async {
+    final envelope = {'cachedAt': _now().millisecondsSinceEpoch, ...payload};
     await box.put(key, jsonEncode(envelope));
   }
 }

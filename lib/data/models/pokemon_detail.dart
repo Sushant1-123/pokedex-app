@@ -7,9 +7,9 @@ class PokemonStat {
   const PokemonStat({required this.name, required this.base});
 
   factory PokemonStat.fromJson(Map<String, dynamic> json) => PokemonStat(
-        name: (json['stat'] as Map<String, dynamic>)['name'] as String,
-        base: json['base_stat'] as int,
-      );
+    name: (json['stat'] as Map<String, dynamic>)['name'] as String,
+    base: json['base_stat'] as int,
+  );
 
   Map<String, dynamic> toCacheJson() => {'name': name, 'base': base};
   factory PokemonStat.fromCacheJson(Map<String, dynamic> json) =>
@@ -45,8 +45,12 @@ class PokemonDetail {
 
     final typesJson = json['types'] as List<dynamic>? ?? [];
     final types = typesJson
-        .map((t) => ((t as Map<String, dynamic>)['type']
-            as Map<String, dynamic>)['name'] as String)
+        .map(
+          (t) =>
+              ((t as Map<String, dynamic>)['type']
+                      as Map<String, dynamic>)['name']
+                  as String,
+        )
         .toList();
 
     final statsJson = json['stats'] as List<dynamic>? ?? [];
@@ -56,8 +60,12 @@ class PokemonDetail {
 
     final abilitiesJson = json['abilities'] as List<dynamic>? ?? [];
     final abilities = abilitiesJson
-        .map((a) => ((a as Map<String, dynamic>)['ability']
-            as Map<String, dynamic>)['name'] as String)
+        .map(
+          (a) =>
+              ((a as Map<String, dynamic>)['ability']
+                      as Map<String, dynamic>)['name']
+                  as String,
+        )
         .toList();
 
     // PokeAPI returns height in decimeters and weight in hectograms.
@@ -92,13 +100,13 @@ class PokemonDetail {
   }
 
   Map<String, dynamic> toCacheJson() => {
-        'id': id,
-        'name': name,
-        'imageUrl': imageUrl,
-        'types': types,
-        'stats': stats.map((s) => s.toCacheJson()).toList(),
-        'abilities': abilities,
-        'heightM': heightM,
-        'weightKg': weightKg,
-      };
+    'id': id,
+    'name': name,
+    'imageUrl': imageUrl,
+    'types': types,
+    'stats': stats.map((s) => s.toCacheJson()).toList(),
+    'abilities': abilities,
+    'heightM': heightM,
+    'weightKg': weightKg,
+  };
 }

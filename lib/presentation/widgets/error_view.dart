@@ -16,22 +16,25 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 56, color: AppTheme.alert),
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 56,
+              color: AppTheme.alert,
+            ),
             const SizedBox(height: 16),
             Text(
               'SIGNAL LOST',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.muted,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.muted),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -65,22 +68,25 @@ class EmptyResultsView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off_rounded,
-                size: 56, color: AppTheme.muted),
+            const Icon(
+              Icons.search_off_rounded,
+              size: 56,
+              color: AppTheme.muted,
+            ),
             const SizedBox(height: 16),
             Text(
               'NO SPECIMENS FOUND FOR "$query"',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               'Try a different name.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.muted,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.muted),
             ),
             const SizedBox(height: 18),
             OutlinedButton.icon(

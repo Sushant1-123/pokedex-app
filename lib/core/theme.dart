@@ -57,8 +57,10 @@ class AppTheme {
         ),
         prefixIconColor: muted,
         hintStyle: const TextStyle(color: muted, fontSize: 12),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
       ),
     );
   }

@@ -21,8 +21,12 @@ class PokemonSummary {
 
     final typesJson = json['types'] as List<dynamic>? ?? [];
     final types = typesJson
-        .map((t) => ((t as Map<String, dynamic>)['type']
-            as Map<String, dynamic>)['name'] as String)
+        .map(
+          (t) =>
+              ((t as Map<String, dynamic>)['type']
+                      as Map<String, dynamic>)['name']
+                  as String,
+        )
         .toList();
 
     return PokemonSummary(
@@ -43,9 +47,9 @@ class PokemonSummary {
   }
 
   Map<String, dynamic> toCacheJson() => {
-        'id': id,
-        'name': name,
-        'imageUrl': imageUrl,
-        'types': types,
-      };
+    'id': id,
+    'name': name,
+    'imageUrl': imageUrl,
+    'types': types,
+  };
 }

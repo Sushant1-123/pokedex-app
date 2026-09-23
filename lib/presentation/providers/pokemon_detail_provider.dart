@@ -28,7 +28,9 @@ class PokemonDetailNotifier
   }
 }
 
-final pokemonDetailProvider = NotifierProvider.family<PokemonDetailNotifier,
-    Result<PokemonDetail>, String>(
-  PokemonDetailNotifier.new,
-);
+final pokemonDetailProvider =
+    NotifierProvider.family<
+      PokemonDetailNotifier,
+      Result<PokemonDetail>,
+      String
+    >(PokemonDetailNotifier.new);

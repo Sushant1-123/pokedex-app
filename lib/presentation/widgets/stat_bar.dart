@@ -27,9 +27,10 @@ class StatBar extends StatelessWidget {
             child: Text(
               label.toUpperCase(),
               style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.muted),
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.muted,
+              ),
             ),
           ),
           SizedBox(
@@ -37,9 +38,10 @@ class StatBar extends StatelessWidget {
             child: Text(
               '$value',
               style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.paper),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.paper,
+              ),
             ),
           ),
           Expanded(
@@ -51,11 +53,11 @@ class StatBar extends StatelessWidget {
                 curve: Curves.easeOutCubic,
                 builder: (context, animatedFraction, _) =>
                     LinearProgressIndicator(
-                  value: animatedFraction,
-                  minHeight: 8,
-                  backgroundColor: AppTheme.line,
-                  valueColor: AlwaysStoppedAnimation(color),
-                ),
+                      value: animatedFraction,
+                      minHeight: 8,
+                      backgroundColor: AppTheme.line,
+                      valueColor: AlwaysStoppedAnimation(color),
+                    ),
               ),
             ),
           ),

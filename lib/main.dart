@@ -22,9 +22,7 @@ Future<void> main() async {
 
   runApp(
     ProviderScope(
-      overrides: [
-        pokemonCacheProvider.overrideWithValue(cache),
-      ],
+      overrides: [pokemonCacheProvider.overrideWithValue(cache)],
       child: const PokedexApp(),
     ),
   );

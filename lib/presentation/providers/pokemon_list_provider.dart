@@ -86,5 +86,5 @@ class PokemonListNotifier extends Notifier<PokemonListState> {
 
 final pokemonListProvider =
     NotifierProvider<PokemonListNotifier, PokemonListState>(
-  PokemonListNotifier.new,
-);
+      PokemonListNotifier.new,
+    );

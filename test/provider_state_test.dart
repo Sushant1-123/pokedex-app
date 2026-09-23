@@ -69,7 +69,7 @@ class _FakeRepository extends PokemonRepository {
   final Object? error;
 
   _FakeRepository({this.detail, this.error})
-      : super(client: PokeApiClient(), cache: PokemonCache());
+    : super(client: PokeApiClient(), cache: PokemonCache());
 
   @override
   Future<(PokemonDetail detail, bool fromCache)> getPokemonDetail(

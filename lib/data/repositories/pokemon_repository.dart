@@ -15,8 +15,8 @@ class PokemonRepository {
   PokemonRepository({
     required PokeApiClient client,
     required PokemonCache cache,
-  })  : _client = client,
-        _cache = cache;
+  }) : _client = client,
+       _cache = cache;
 
   Future<(List<PokemonSummary> items, bool fromCache)> getPokemonPage({
     required int offset,
@@ -42,7 +42,7 @@ class PokemonRepository {
 
   /// Name + id of every Pokemon, used to search beyond the loaded pages.
   Future<(List<PokemonIndexEntry> entries, bool fromCache)>
-      getPokemonIndex() async {
+  getPokemonIndex() async {
     final cached = _cache.readIndex(catalogIndexKey);
     if (cached != null) {
       return (_indexFromCache(cached), true);

@@ -25,11 +25,12 @@ class PokeApiClient {
     final listRes = await _http.get(listUri);
     if (listRes.statusCode != 200) {
       throw PokeApiException(
-          'Failed to load Pokemon list (${listRes.statusCode})');
+        'Failed to load Pokemon list (${listRes.statusCode})',
+      );
     }
     final listBody = jsonDecode(listRes.body) as Map<String, dynamic>;
-    final results =
-        (listBody['results'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final results = (listBody['results'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
 
     final details = await Future.wait(
       results.map((r) => _fetchDetailJson(r['url'] as String)),
@@ -48,7 +49,8 @@ class PokeApiClient {
     final res = await _http.get(uri);
     if (res.statusCode != 200) {
       throw PokeApiException(
-          'Failed to load Pokemon index (${res.statusCode})');
+        'Failed to load Pokemon index (${res.statusCode})',
+      );
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     return (body['results'] as List<dynamic>)

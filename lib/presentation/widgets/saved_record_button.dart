@@ -18,8 +18,9 @@ class SavedRecordButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final saved = switch (ref.watch(savedRecordsProvider)) {
-      Success<List<PokemonSummary>>(data: final records) =>
-        records.any((record) => record.id == pokemon.id),
+      Success<List<PokemonSummary>>(data: final records) => records.any(
+        (record) => record.id == pokemon.id,
+      ),
       _ => false,
     };
     return IconButton(

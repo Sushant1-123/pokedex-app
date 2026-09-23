@@ -12,12 +12,13 @@ class SavedRecordsNotifier extends Notifier<Result<List<PokemonSummary>>> {
 
   void load() {
     try {
-      final records = ref
-          .read(pokemonCacheProvider)
-          .readSavedRecords()
-          .map(PokemonSummary.fromCacheJson)
-          .toList()
-        ..sort((a, b) => a.id.compareTo(b.id));
+      final records =
+          ref
+              .read(pokemonCacheProvider)
+              .readSavedRecords()
+              .map(PokemonSummary.fromCacheJson)
+              .toList()
+            ..sort((a, b) => a.id.compareTo(b.id));
       state = Success(records, fromCache: true);
     } catch (error) {
       state = Failure(error.toString());
@@ -47,5 +48,5 @@ class SavedRecordsNotifier extends Notifier<Result<List<PokemonSummary>>> {
 
 final savedRecordsProvider =
     NotifierProvider<SavedRecordsNotifier, Result<List<PokemonSummary>>>(
-  SavedRecordsNotifier.new,
-);
+      SavedRecordsNotifier.new,
+    );
