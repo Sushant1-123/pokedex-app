@@ -9,6 +9,7 @@ import 'package:pokedex_app/core/constants.dart';
 import 'package:pokedex_app/data/datasources/pokeapi_client.dart';
 import 'package:pokedex_app/data/datasources/pokemon_cache.dart';
 import 'package:pokedex_app/data/models/fetch_source.dart';
+import 'package:pokedex_app/data/models/pokemon_detail.dart';
 import 'package:pokedex_app/data/models/pokemon_species.dart';
 import 'package:pokedex_app/data/repositories/pokemon_repository.dart';
 
@@ -137,6 +138,34 @@ void main() {
 
     test('has a 1h TTL', () async {
       await expectOneHourTtl(() async => (await repository.getSpecies(132)).$2);
+    });
+
+    test('the cached colour is read without any request', () async {
+      expect(repository.cachedSpeciesColor(132), isNull);
+      await cache.write(
+        CacheBox.detail,
+        '132',
+        const PokemonDetail(
+          id: 132,
+          name: 'ditto',
+          speciesId: 132,
+          imageUrl: null,
+          types: ['normal'],
+          stats: [],
+          abilities: [],
+          heightM: .3,
+          weightKg: 4,
+        ).toCacheJson(),
+      );
+      expect(repository.cachedSpeciesColor(132), isNull);
+
+      await repository.getSpecies(132);
+      final fetched = requests.length;
+      expect(repository.cachedSpeciesColor(132), 'purple');
+      expect(requests, hasLength(fetched));
+
+      now = now.add(const Duration(minutes: 61));
+      expect(repository.cachedSpeciesColor(132), isNull);
     });
   });
 
@@ -300,6 +329,7 @@ MockClientHandler _pokeApi(List<Uri> requests) {
         'growth_rate': resource('growth-rate', 'medium', 2),
         'is_legendary': false,
         'is_mythical': false,
+        'color': resource('pokemon-color', 'purple', 5),
       },
       '/api/v2/evolution-chain/66' => {
         'id': 66,

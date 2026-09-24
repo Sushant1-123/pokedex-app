@@ -180,7 +180,12 @@ class AppMotion {
 
   static const Duration hover = Duration(milliseconds: 180);
   static const Duration press = Duration(milliseconds: 110);
-  static const Duration hop = Duration(milliseconds: 420);
+
+  /// Card hover: the artwork slides in from the entry side, hops and
+  /// squashes, bobs while hovered, and settles when the cursor leaves.
+  static const Duration cardEntrance = Duration(milliseconds: 450);
+  static const Duration cardSettle = Duration(milliseconds: 260);
+  static const Duration cardBobPeriod = Duration(milliseconds: 1600);
 
   /// Each card starts this much after the previous one on a page load...
   static const Duration staggerStep = Duration(milliseconds: 22);
@@ -193,6 +198,14 @@ class AppMotion {
   static const double cardLift = 4;
   static const double cardPressScale = .97;
   static const double cardHop = 10;
+  static const double cardBob = 3;
+  static const double cardSquash = .08;
+
+  /// Fractions of the artwork width: where the slide starts, the gap
+  /// between motion-trail ghosts, and the nudge toward the exit side.
+  static const double cardSlideFrom = .4;
+  static const double cardTrailGap = .08;
+  static const double cardExitSlide = .06;
 
   /// How far artwork pops out above the top of its container.
   static const double artworkOverlap = 14;

@@ -170,6 +170,9 @@ class FakeRepository extends PokemonRepository {
   );
 
   @override
+  String? cachedSpeciesColor(int id) => null;
+
+  @override
   List<PokemonSummary> getSavedRecords() =>
       saved.values.toList()..sort((a, b) => a.id.compareTo(b.id));
 

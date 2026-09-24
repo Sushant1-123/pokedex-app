@@ -169,6 +169,19 @@ class PokemonRepository {
     );
   }
 
+  /// PokeAPI species colour of Pokemon [id] when its detail and species
+  /// records are both cached (and fresh); never makes a request.
+  String? cachedSpeciesColor(int id) {
+    final detail = _cache.read(CacheBox.detail, '$id');
+    if (detail == null) return null;
+    final speciesId = PokemonDetail.fromCacheJson(
+      detail as Map<String, dynamic>,
+    ).speciesId;
+    final species = _cache.read(CacheBox.species, '$speciesId');
+    if (species == null) return null;
+    return PokemonSpecies.fromCacheJson(species as Map<String, dynamic>).color;
+  }
+
   /// Bookmarked Pokemon, sorted by id. Stored without a TTL: these are the
   /// user's own records, not cached API responses.
   List<PokemonSummary> getSavedRecords() =>

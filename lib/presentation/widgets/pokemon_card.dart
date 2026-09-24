@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../core/design_tokens.dart';
 import '../../data/models/pokemon_summary.dart';
+import '../providers/core_providers.dart';
 import 'grid_background.dart';
 import 'pokemon_image.dart';
 import 'saved_record_button.dart';
@@ -26,13 +29,98 @@ double pokemonCardExtent(double width) => 190 + width * .58;
 Duration staggerDelay(int index) =>
     AppMotion.staggerStep * math.min(index, AppMotion.staggerMaxSteps);
 
+/// Which side of a [width]-wide box a pointer at [localX] is on: -1 for
+/// the left half, 1 for the right.
+double entrySide(double localX, double width) => localX < width / 2 ? -1 : 1;
+
+/// Where the card artwork is drawn relative to its resting place.
+@immutable
+class CardArtPose {
+  /// Horizontal offset as a fraction of the artwork width.
+  final double dx;
+
+  /// Vertical offset in pixels (negative is up).
+  final double dy;
+
+  /// Landing squash: wider and shorter by this fraction.
+  final double squash;
+
+  /// Motion-trail strength, 0..1, with ghosts drawn toward [trailSide].
+  final double trail;
+  final double trailSide;
+
+  const CardArtPose({
+    this.dx = 0,
+    this.dy = 0,
+    this.squash = 0,
+    this.trail = 0,
+    this.trailSide = 0,
+  });
+
+  static const rest = CardArtPose();
+
+  bool get atRest => dx == 0 && dy == 0 && squash == 0 && trail == 0;
+
+  /// Hover entrance at progress [t] (0..1) for a cursor that came in from
+  /// [side]: slide in from that side with a fading trail, then a hop that
+  /// lands with a squash.
+  factory CardArtPose.entrance(double t, double side) {
+    const slideEnd = .55;
+    const landAt = .7;
+    if (t < slideEnd) {
+      final p = t / slideEnd;
+      return CardArtPose(
+        dx:
+            side *
+            AppMotion.cardSlideFrom *
+            (1 - Curves.easeOutCubic.transform(p)),
+        trail: 1 - p,
+        trailSide: side,
+      );
+    }
+    final p = (t - slideEnd) / (1 - slideEnd);
+    if (p < landAt) {
+      return CardArtPose(
+        dy: -math.sin(math.pi * p / landAt) * AppMotion.cardHop,
+      );
+    }
+    return CardArtPose(
+      squash:
+          math.sin(math.pi * (p - landAt) / (1 - landAt)) *
+          AppMotion.cardSquash,
+    );
+  }
+
+  /// This pose plus the idle bob at [phase] (0..1).
+  CardArtPose bobbed(double phase) => CardArtPose(
+    dx: dx,
+    dy: dy - math.sin(2 * math.pi * phase) * AppMotion.cardBob,
+    squash: squash,
+    trail: trail,
+    trailSide: trailSide,
+  );
+
+  /// This pose eased back to rest at progress [u] (0..1), with a small
+  /// slide toward the exit [side] on the way.
+  CardArtPose settle(double u, double side) {
+    final keep = 1 - Curves.easeOutCubic.transform(u);
+    return CardArtPose(
+      dx: dx * keep + side * AppMotion.cardExitSlide * math.sin(math.pi * u),
+      dy: dy * keep,
+      squash: squash * keep,
+    );
+  }
+}
+
 /// Directory card: dex number, name, glowing type pills, artwork on the
 /// coordinate grid, and HP + best-stat bars in the footer.
 ///
-/// It fades/slides in (staggered by [index]) when a page loads, lifts with
-/// a glow on hover while the Pokemon hops, and scales down when pressed.
-/// With reduce motion only the press feedback remains.
-class PokemonCard extends StatefulWidget {
+/// It fades/slides in (staggered by [index]) when a page loads and scales
+/// down when pressed. With a mouse, hovering lifts it with a glow while the
+/// artwork slides in from the side the cursor entered, trailing its colour,
+/// hops and bobs; leaving settles it back. Only the hovered card animates.
+/// With reduce motion only the lift, glow and press feedback remain.
+class PokemonCard extends ConsumerStatefulWidget {
   final PokemonSummary pokemon;
   final VoidCallback onTap;
   final int index;
@@ -45,15 +133,24 @@ class PokemonCard extends StatefulWidget {
   });
 
   @override
-  State<PokemonCard> createState() => _PokemonCardState();
+  ConsumerState<PokemonCard> createState() => _PokemonCardState();
 }
 
-class _PokemonCardState extends State<PokemonCard>
+class _PokemonCardState extends ConsumerState<PokemonCard>
     with TickerProviderStateMixin {
-  late final AnimationController _hop = AnimationController(
+  late final AnimationController _enter = AnimationController(
     vsync: this,
-    duration: AppMotion.hop,
+    duration: AppMotion.cardEntrance,
   );
+  late final AnimationController _bob = AnimationController(
+    vsync: this,
+    duration: AppMotion.cardBobPeriod,
+  );
+  late final AnimationController _settle = AnimationController(
+    vsync: this,
+    duration: AppMotion.cardSettle,
+  );
+  late final Listenable _art = Listenable.merge([_enter, _bob, _settle]);
   late final AnimationController _entrance = AnimationController(
     vsync: this,
     duration: staggerDelay(widget.index) + AppMotion.staggerItem,
@@ -72,6 +169,10 @@ class _PokemonCardState extends State<PokemonCard>
   bool _hovered = false;
   bool _pressed = false;
   bool _reducedMotion = false;
+  double _enterSide = -1;
+  double _exitSide = 1;
+  CardArtPose _leftFrom = CardArtPose.rest;
+  Color? _trailColor;
 
   @override
   void didChangeDependencies() {
@@ -86,14 +187,51 @@ class _PokemonCardState extends State<PokemonCard>
 
   @override
   void dispose() {
-    _hop.dispose();
+    _enter.dispose();
+    _bob.dispose();
+    _settle.dispose();
     _entrance.dispose();
     super.dispose();
   }
 
-  void _setHovered(bool hovered) {
-    setState(() => _hovered = hovered);
-    if (hovered && !_reducedMotion) _hop.forward(from: 0);
+  double _sideOf(Offset local) => entrySide(local.dx, context.size!.width);
+
+  CardArtPose get _pose {
+    if (_reducedMotion) return CardArtPose.rest;
+    if (_hovered) {
+      return CardArtPose.entrance(_enter.value, _enterSide).bobbed(_bob.value);
+    }
+    return _settle.isAnimating
+        ? _leftFrom.settle(_settle.value, _exitSide)
+        : CardArtPose.rest;
+  }
+
+  void _onEnter(PointerEnterEvent event) {
+    if (event.kind != PointerDeviceKind.mouse) return;
+    setState(() => _hovered = true);
+    if (_reducedMotion) return;
+    _enterSide = _sideOf(event.localPosition);
+    _trailColor = pokemonGlowColor(
+      ref.read(pokemonRepositoryProvider).cachedSpeciesColor(widget.pokemon.id),
+      widget.pokemon.types,
+    );
+    _settle.value = 0;
+    _bob.value = 0;
+    _enter.forward(from: 0).whenCompleteOrCancel(() {
+      if (mounted && _hovered && _enter.isCompleted) _bob.repeat();
+    });
+  }
+
+  void _onExit(PointerExitEvent event) {
+    if (!_hovered) return;
+    final from = _pose;
+    setState(() => _hovered = false);
+    if (_reducedMotion) return;
+    _enter.stop();
+    _bob.stop();
+    _leftFrom = from;
+    _exitSide = _sideOf(event.localPosition);
+    _settle.forward(from: 0);
   }
 
   @override
@@ -109,7 +247,7 @@ class _PokemonCardState extends State<PokemonCard>
       curve: Curves.easeOut,
       transform: Matrix4.translationValues(
         0,
-        _hovered && !_reducedMotion ? -AppMotion.cardLift : 0,
+        _hovered ? -AppMotion.cardLift : 0,
         0,
       ),
       decoration: BoxDecoration(
@@ -173,7 +311,15 @@ class _PokemonCardState extends State<PokemonCard>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Expanded(
-                  child: _Artwork(pokemon: pokemon, accent: accent, hop: _hop),
+                  child: AnimatedBuilder(
+                    animation: _art,
+                    builder: (context, _) => CardArtwork(
+                      pokemon: pokemon,
+                      accent: accent,
+                      trailColor: _trailColor ?? accent,
+                      pose: _pose,
+                    ),
+                  ),
                 ),
                 if (pokemon.stats.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.md),
@@ -197,8 +343,8 @@ class _PokemonCardState extends State<PokemonCard>
             end: Offset.zero,
           ).animate(entrance),
           child: MouseRegion(
-            onEnter: (_) => _setHovered(true),
-            onExit: (_) => _setHovered(false),
+            onEnter: _onEnter,
+            onExit: _onExit,
             child: AnimatedScale(
               scale: _pressed ? AppMotion.cardPressScale : 1,
               duration: AppMotion.press,
@@ -212,17 +358,35 @@ class _PokemonCardState extends State<PokemonCard>
 }
 
 /// Artwork on the tinted coordinate grid, popping out above its top edge,
-/// with a faint dex-number watermark. [hop] makes it jump on hover.
-class _Artwork extends StatelessWidget {
+/// with a faint dex-number watermark, drawn at [pose]. While the pose is
+/// away from rest the artwork is clipped to its box sideways, and a
+/// motion trail in [trailColor] follows it.
+class CardArtwork extends StatelessWidget {
   final PokemonSummary pokemon;
   final Color accent;
-  final Animation<double> hop;
+  final Color trailColor;
+  final CardArtPose pose;
 
-  const _Artwork({
+  const CardArtwork({
+    super.key,
     required this.pokemon,
     required this.accent,
-    required this.hop,
+    required this.trailColor,
+    required this.pose,
   });
+
+  Widget _posed(Widget child, {double shift = 0}) => FractionalTranslation(
+    translation: Offset(pose.dx + shift, 0),
+    child: Transform.translate(
+      offset: Offset(0, pose.dy),
+      child: Transform.scale(
+        alignment: Alignment.bottomCenter,
+        scaleX: 1 + pose.squash,
+        scaleY: 1 - pose.squash,
+        child: child,
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) => Stack(
@@ -249,23 +413,61 @@ class _Artwork extends StatelessWidget {
       ),
       Positioned.fill(
         bottom: AppSpacing.sm,
-        child: AnimatedBuilder(
-          animation: hop,
-          builder: (context, child) => Transform.translate(
-            offset: Offset(
-              0,
-              -math.sin(hop.value * math.pi) * AppMotion.cardHop,
-            ),
-            child: child,
-          ),
-          child: Hero(
-            tag: 'pokemon-image-${pokemon.id}',
-            child: PokemonImage(url: pokemon.imageUrl, accent: accent),
+        child: ClipRect(
+          clipper: const _SideClipper(),
+          clipBehavior: pose.atRest ? Clip.none : Clip.hardEdge,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              IgnorePointer(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (pose.trail > 0)
+                      for (var k = 3; k >= 1; k--)
+                        Opacity(
+                          opacity: (pose.trail * .5 / k).clamp(0.0, 1.0),
+                          child: _posed(
+                            shift: pose.trailSide * k * AppMotion.cardTrailGap,
+                            ColorFiltered(
+                              colorFilter: ColorFilter.mode(
+                                trailColor,
+                                BlendMode.srcIn,
+                              ),
+                              child: PokemonImage(
+                                url: pokemon.imageUrl,
+                                accent: trailColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                  ],
+                ),
+              ),
+              _posed(
+                Hero(
+                  tag: 'pokemon-image-${pokemon.id}',
+                  child: PokemonImage(url: pokemon.imageUrl, accent: accent),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     ],
   );
+}
+
+/// Clips sideways only, so the artwork can still pop out above its box.
+class _SideClipper extends CustomClipper<Rect> {
+  const _SideClipper();
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(0, -size.height, size.width, size.height * 2);
+
+  @override
+  bool shouldReclip(_SideClipper oldClipper) => false;
 }
 
 /// "HP BASE 078 / 255" plus the Pokemon's best other stat.
