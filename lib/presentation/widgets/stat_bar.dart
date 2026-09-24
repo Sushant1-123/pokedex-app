@@ -104,7 +104,16 @@ class MiniStatBar extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          Text(value, style: AppTypography.numeric.copyWith(color: color)),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                style: AppTypography.numeric.copyWith(color: color),
+              ),
+            ),
+          ),
         ],
       ),
       const SizedBox(height: AppSpacing.xs),
