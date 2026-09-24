@@ -4,14 +4,14 @@ A cross-platform "research-grade field Pokedex". It opens with an anime-style
 intro in which a trainer throws a Poke Ball that splits open to reveal the app. The
 directory pages through every species, searches the full catalog (alternate
 forms included) and filters by type. Each Pokemon has a detail dossier with
-species data, its evolution chain, a defensive type matrix, its cry,
+species data, its evolution chain, a defensive type matrix,
 animated sprites and a colour-matched entrance animation. Five field tools
 sit alongside: Evolution Engine, Type Spectra, Habitat Radar, Compare Lab
 and Ability Codex.
 
 - **Data source:** [pokeapi.co](https://pokeapi.co) is the only API. Images
-  come from the PokeAPI sprites repository and cries from the PokeAPI cries
-  repository (both on raw.githubusercontent.com, as returned by the API).
+  come from the PokeAPI sprites repository (on raw.githubusercontent.com, as
+  returned by the API). The app plays no sound.
 - **State management:** Riverpod `NotifierProvider` / `NotifierProvider.family`
   only. Plain `Provider` is used just for dependency injection.
 - **Persistence/cache:** Hive (disk-backed) with a 1-hour TTL on every API
@@ -29,8 +29,6 @@ and Ability Codex.
   committed `pubspec.lock` resolves packages that need Dart 3.11 /
   Flutter 3.38.4. Verified with Flutter 3.47.5 / Dart 3.13.4.
   [Install guide](https://docs.flutter.dev/get-started/install)
-- **Linux desktop builds only:** `audioplayers` needs GStreamer development
-  packages (`libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev`).
 - For web hosting: a [Firebase](https://firebase.google.com) account and the
   Firebase CLI.
 
@@ -63,21 +61,30 @@ flutter test
 ```
 
 The tests never touch the network. They use an in-memory
-`FakeRepository`/`FakeCryPlayer` (`test/support/fakes.dart`), `MockClient`
+`FakeRepository` (`test/support/fakes.dart`), `MockClient`
 from `package:http/testing.dart`, and a real Hive store in a temp directory
 with an injected clock. They cover:
 
 - **Models:** species parsing (genus, cleaned flavor text, gender ratio incl.
   genderless); evolution chains (linear with levels, branching (Eevee), single stage); the defensive matrix (dual types, 4×, 0×, cancelled
-  matchups); detail parsing (cries fallback, sprites, hidden abilities).
+  matchups); detail parsing (sprites, hidden abilities).
 - **Directory:** numbered pagination (page change, page count, page-loading
   state, retry, fast page switching); base species vs forms (id < 10000);
   debounced search; stale responses ignored; search and type results
   paginated; type ∩ query; real latency readout.
+- **Phone pager:** Prev/Next disabled at the ends, 44px tap targets, the
+  page-jump sheet changes the page, the bar sits above the bottom navigation,
+  and no overflow at 320/360/390/430px; the numbered pager collapses to "…"
+  in a narrow panel.
+- **Hover:** card entry side (left/right), the slide-in comes from that side
+  while other cards stay still, the artwork returns to rest on exit, reduce
+  motion and touch skip it; the detail viewport leans toward the cursor.
+- **No sound:** a test checks that `audioplayers` and all audio code are gone.
 - **Cache:** the 1h TTL of the name index, `/type` data, species, evolution
-  chains and details; eviction of expired entries.
+  chains and details; eviction of expired entries; the cached species colour
+  lookup makes no request.
 - **Detail screen:** prev/next boundaries (#1 and the last species); the
-  animated-sprite toggle and its fallback; tapping plays the cry; layout at
+  animated-sprite toggle and its fallback; tapping plays a move; layout at
   mobile/tablet/desktop sizes without overflow.
 - **Intro:** it plays on launch while the directory preloads underneath;
   SKIP / tap-anywhere reveal the directory; reduce-motion uses a < 400ms
@@ -115,7 +122,6 @@ lib/
     datasources/
       pokeapi_client.dart  # ONLY place that calls pokeapi.co
       pokemon_cache.dart   # Hive boxes with the 1h TTL
-      cry_player.dart      # audioplayers wrapper, fails silently
     repositories/
       pokemon_repository.dart  # cache-then-network, timed network requests
   presentation/
@@ -129,17 +135,26 @@ lib/
 ```
 
 The layering is data → repository → presentation. Screens never call the
-network, Hive or the audio player directly. They go through providers backed
-by `PokemonRepository` (and `cryPlayerProvider` for sound).
+network or Hive directly. They go through providers backed by
+`PokemonRepository`.
 
 ---
 
 ## 5. Directory: pagination, search, type filter
 
-- **Numbered pages of 30.** 30 fills the 2-, 3- and 5-column grids evenly.
-  The pager shows Prev, 1, 2, 3, …, last, Next, and each page change scrolls
-  back to the top. A slow page change is discarded if a newer one wins. A
-  failed page keeps the pager and offers a retry.
+- **Pages of 30.** 30 fills the 2-, 3- and 5-column grids evenly. Each
+  page change scrolls back to the top, for the directory, search and
+  type-filter results alike. A slow page change is discarded if a newer one
+  wins. A failed page keeps the pager and offers a retry.
+- **Phones (under 600px):** a compact bar is pinned at the bottom, above the
+  navigation bar and inside the safe area: large "‹ PREV" and "NEXT ›"
+  buttons (44px tap targets, disabled on the first/last page) with
+  "Page X of Y" between them. Tapping "Page X of Y" opens a bottom sheet with
+  a scrollable grid of every page, opened at the current (highlighted) one.
+  The bar hides while the keyboard is open and when there is only one page.
+- **Tablet and desktop:** the numbered pager (Prev, 1, 2, 3, …, last, Next).
+  When its panel is tight it collapses to first … current … last, and it
+  scales down rather than overflow.
 - **Base species vs forms.** The directory lists base species only
   (ids < 10000). Search also finds alternate forms (megas, regional forms,
   ...), whose ids start at 10001.
@@ -166,9 +181,19 @@ by `PokemonRepository` (and `cryPlayerProvider` for sound).
 - A page of cards fades and slides in with a short stagger (22ms per card,
   capped at 12 steps), so a page is in within ~0.5s. There are no timers:
   each card's controller spans its delay plus its own 240ms.
-- Hover (web/desktop): the card lifts with a soft glow in the type colour,
-  and the Pokemon hops inside its artwork box. Touch: the card scales down
-  while pressed. With reduce motion there is no hop or stagger.
+- Hover (web/desktop, mouse only): the card lifts with a soft glow in the
+  type colour. The side the cursor came in from (entry x vs the card centre)
+  decides where the artwork slides in from: it starts ~40% outside its box,
+  clipped sideways to the artwork area, with a short glowing trail in the
+  species colour (when the species is already cached, else the type
+  colour), then lands with a small hop and squash (~450ms). While hovered it
+  bobs gently. On leaving it eases back to rest with a small slide toward
+  the exit side. Each card owns its controllers (`MouseRegion` +
+  `AnimationController`s), so only the hovered card animates, and a fast
+  sweep across cards never makes one jump or flicker.
+- Touch: the card scales down while pressed, with no hover animation.
+- Reduce motion: no stagger, slide or hop; hover keeps only the lift and
+  glow.
 - Each artwork area has a type-colour gradient at the top, a faint large
   dex-number watermark, and artwork that pops out above its top edge.
 - Type chips have a coloured dot, and the active chip glows in its type
@@ -219,16 +244,16 @@ loads on its own and has its own skeleton/error state:
   light tones that glow on the dark surface; without a species colour the
   primary type colour is used. The viewport also shows a large faded dex
   number and a soft floor shadow.
-- **Tap:** alternates a jump and a kick, and plays the cry (`cries.latest`,
-  falling back to `cries.legacy`) through `audioplayers`. Failures are
-  silent (e.g. OGG in Safari). A small speaker hint marks the Pokemon as
-  tappable.
+- **Hover (web/desktop):** with the cursor over the artwork, the Pokemon
+  leans slightly toward the cursor's side and does one small jump, and keeps
+  its idle float while hovered.
+- **Click / tap:** alternates a jump and a kick. There is no sound.
 - **"▶ ANIMATED" toggle:** shows the Showdown sprite
   (`sprites.other.showdown.front_default`). It is disabled with the tooltip
   "No animated sprite" when there is none, and the choice is remembered for
   the session (NotifierProvider).
-- **Reduce motion:** no entrance moves, trail, float or tap moves, only a
-  short fade (the cry still plays).
+- **Reduce motion:** no entrance moves, trail, float, hover lean/jump or
+  tap moves, only a short fade.
 
 ## 7. Launch intro
 
@@ -304,7 +329,7 @@ and refetched.
 
 | Box                       | Key                 | Contents                                         | TTL  |
 | ------------------------- | ------------------- | ------------------------------------------------ | ---- |
-| `pokemon_detail_cache_v2` | Pokemon id          | `/pokemon/{id}`: stats, types, abilities, sprites, cries | 1h |
+| `pokemon_detail_cache_v2` | Pokemon id          | `/pokemon/{id}`: stats, types, abilities, sprites | 1h |
 | `pokemon_index_cache`     | `"all"`             | Name index of every Pokemon (name + id)          | 1h   |
 | `pokemon_index_cache`     | `"typedata:<type>"` | `/type/{name}`: members + damage relations       | 1h   |
 | `pokemon_species_cache`   | species id          | `/pokemon-species/{id}`: genus, flavor, gender, chain id | 1h |
@@ -349,7 +374,7 @@ flutter build apk --release        # Android
 flutter build ios --release        # iOS (macOS + Xcode, signing)
 flutter build macos --release      # macOS (network.client entitlement is set)
 flutter build windows --release    # Windows (Visual Studio C++ toolchain)
-flutter build linux --release      # Linux (GStreamer dev packages, see §1)
+flutter build linux --release      # Linux
 ```
 
 ---
@@ -384,7 +409,9 @@ handle exhaustively, this makes races and missing states hard to introduce.
   and a split reveal of the live app (section 7).
 - **Detail entrance:** dash-in with a trail, a jump with a floor ring and a
   kick with an impact flash, all in the Pokemon's own colour, plus tap
-  moves and cries (section 6).
+  moves and a hover lean (section 6).
+- **Directory card hover:** a directional slide-in with a colour trail, hop
+  and idle bob (section 5).
 - **Evolution Engine, Type Spectra, Habitat Radar, Compare Lab and Ability
   Codex** (section 8).
 
@@ -412,8 +439,6 @@ handle exhaustively, this makes races and missing states hard to introduce.
 
 - `flutter analyze`: no issues. `flutter test`: all tests pass.
   `flutter build web --release`: succeeds.
-- Cries are OGG files. Browsers without OGG support (Safari) stay silent by
-  design.
 - Search/type pages resolve up to 30 detail requests in parallel. If one
   fails, that page shows a retry and the pager stays usable.
 
@@ -424,5 +449,5 @@ handle exhaustively, this makes races and missing states hard to introduce.
   (`assets/images/intro/trainer.webp`).
 - Plus Jakarta Sans © The Plus Jakarta Sans Project Authors, SIL Open Font
   License 1.1 (`assets/fonts/OFL.txt`).
-- Pokemon artwork, sprites and cries are loaded from the PokeAPI sprites and
-  cries repositories, as returned by pokeapi.co.
+- Pokemon artwork and sprites are loaded from the PokeAPI sprites
+  repository, as returned by pokeapi.co.
