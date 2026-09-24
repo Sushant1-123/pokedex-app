@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/datasources/cry_player.dart';
 import '../../data/datasources/pokeapi_client.dart';
 import '../../data/datasources/pokemon_cache.dart';
 import '../../data/repositories/pokemon_repository.dart';
@@ -24,10 +23,4 @@ final pokemonRepositoryProvider = Provider<PokemonRepository>((ref) {
     cache: ref.watch(pokemonCacheProvider),
     onNetwork: (event) => ref.read(nodeStatusProvider.notifier).record(event),
   );
-});
-
-final cryPlayerProvider = Provider<CryPlayer>((ref) {
-  final player = CryPlayer();
-  ref.onDispose(player.dispose);
-  return player;
 });

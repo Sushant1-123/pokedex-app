@@ -13,14 +13,12 @@ const _sprite = 'https://raw.githubusercontent.com/showdown/2.gif';
 
 void main() {
   late FakeRepository repository;
-  late FakeCryPlayer cries;
 
   setUp(() {
     repository = FakeRepository(
       index: catalog(151),
       animatedSprites: const {2: _sprite},
     );
-    cries = FakeCryPlayer();
   });
 
   Future<ProviderContainer> open(
@@ -33,7 +31,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: appOverrides(repository, cryPlayer: cries),
+        overrides: appOverrides(repository),
         child: MaterialApp(
           theme: AppTheme.dark(),
           home: PokemonDetailScreen(pokemonId: id),
@@ -121,17 +119,29 @@ void main() {
     });
   });
 
-  testWidgets('tapping the Pokemon plays its cry', (tester) async {
-    await open(tester, 3);
-
-    await tester.tap(
-      find.byWidgetPredicate(
-        (w) => w is Semantics && w.properties.label == 'Play cry',
-      ),
+  group('viewport interaction', () {
+    Finder artwork() => find.byWidgetPredicate(
+      (w) => w is Semantics && w.properties.label == 'Play move',
     );
-    await tester.pump(const Duration(milliseconds: 500));
 
-    expect(cries.played, ['https://example.test/cries/3.ogg']);
+    // Waits for the entrance to finish so only the idle float is running.
+    Future<void> settled(WidgetTester tester) async {
+      await open(tester, 3);
+      await tester.pump(const Duration(seconds: 2));
+    }
+
+    testWidgets('tapping the Pokemon plays a move', (tester) async {
+      await settled(tester);
+
+      final before = tester.getCenter(artwork());
+      await tester.tap(artwork());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect((tester.getCenter(artwork()) - before).distance, greaterThan(8));
+      expect(find.textContaining('CRY'), findsNothing);
+      await tester.pump(const Duration(seconds: 1));
+    });
   });
 
   group('responsive layout', () {

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pokedex_app/core/constants.dart';
-import 'package:pokedex_app/data/datasources/cry_player.dart';
 import 'package:pokedex_app/data/datasources/pokeapi_client.dart';
 import 'package:pokedex_app/data/datasources/pokemon_cache.dart';
 import 'package:pokedex_app/data/models/ability.dart';
@@ -98,7 +97,6 @@ class FakeRepository extends PokemonRepository {
       speciesId: id,
       imageUrl: pokemonArtworkUrl(id),
       animatedSpriteUrl: animatedSprites[id],
-      cryUrl: 'https://example.test/cries/$id.ogg',
       types: types.isEmpty ? const ['normal'] : types,
       stats: const [
         PokemonStat(name: 'hp', base: 45),
@@ -183,16 +181,6 @@ class FakeRepository extends PokemonRepository {
   Future<void> deleteSavedRecord(int id) async => saved.remove(id);
 }
 
-class FakeCryPlayer extends CryPlayer {
-  final played = <String>[];
-
-  @override
-  Future<void> play(String url) async => played.add(url);
-
-  @override
-  Future<void> dispose() async {}
-}
-
 /// Skips the launch intro in widget tests that are about other screens.
 class FinishedIntroNotifier extends IntroNotifier {
   @override
@@ -201,10 +189,8 @@ class FinishedIntroNotifier extends IntroNotifier {
 
 List<Override> appOverrides(
   FakeRepository repository, {
-  FakeCryPlayer? cryPlayer,
   bool skipIntro = true,
 }) => [
   pokemonRepositoryProvider.overrideWithValue(repository),
-  cryPlayerProvider.overrideWithValue(cryPlayer ?? FakeCryPlayer()),
   if (skipIntro) introProvider.overrideWith(FinishedIntroNotifier.new),
 ];

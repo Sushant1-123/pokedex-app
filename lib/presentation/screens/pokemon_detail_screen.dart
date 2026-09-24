@@ -96,7 +96,6 @@ class PokemonDetailScreen extends ConsumerWidget {
             heroTag: heroTag,
             imageUrl: data.detail.imageUrl,
             animatedSpriteUrl: data.detail.animatedSpriteUrl,
-            cryUrl: data.detail.cryUrl,
             glow: pokemonGlowColor(switch (data.species) {
               Success(:final data) => data.color,
               _ => null,

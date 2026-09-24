@@ -25,8 +25,8 @@ class AppConstants {
   /// Large enough to return every Pokemon in one request for the name index.
   static const int nameIndexLimit = 100000;
 
-  /// Suffixed because the cached record shape changed (cries, sprites,
-  /// abilities); the old box is simply never read again.
+  /// Suffixed because the cached record shape changed (sprites, abilities);
+  /// the old box is simply never read again.
   static const String pokemonDetailBoxName = 'pokemon_detail_cache_v2';
   static const String pokemonIndexBoxName = 'pokemon_index_cache';
   static const String pokemonSpeciesBoxName = 'pokemon_species_cache';

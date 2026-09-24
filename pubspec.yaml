@@ -30,9 +30,6 @@ dependencies:
   # Path for Hive box storage on native platforms
   path_provider: ^2.1.4
 
-  # Pokemon cries (cries.latest / cries.legacy URLs from /pokemon)
-  audioplayers: ^6.8.1
-
   cupertino_icons: ^1.0.8
 
 dev_dependencies:

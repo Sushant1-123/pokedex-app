@@ -278,62 +278,54 @@ void main() {
   });
 
   group('pokemon detail', () {
-    Map<String, dynamic> json({Map<String, dynamic>? cries, bool art = true}) =>
-        {
-          'id': 10034,
-          'name': 'charizard-mega-x',
-          'height': 17,
-          'weight': 1105,
-          'base_experience': 285,
-          'species': _named(
-            'charizard',
-            'https://pokeapi.co/api/v2/pokemon-species/6/',
-          ),
-          'cries': ?cries,
-          'sprites': {
-            'other': {
-              'official-artwork': {
-                'front_default': art ? pokemonArtworkUrl(10034) : null,
-              },
-              'showdown': {'front_default': null},
-            },
+    Map<String, dynamic> json({bool art = true}) => {
+      'id': 10034,
+      'name': 'charizard-mega-x',
+      'height': 17,
+      'weight': 1105,
+      'base_experience': 285,
+      'species': _named(
+        'charizard',
+        'https://pokeapi.co/api/v2/pokemon-species/6/',
+      ),
+      'sprites': {
+        'other': {
+          'official-artwork': {
+            'front_default': art ? pokemonArtworkUrl(10034) : null,
           },
-          'types': [
-            {'type': _named('fire', '')},
-            {'type': _named('dragon', '')},
-          ],
-          'stats': [
-            {'stat': _named('hp', ''), 'base_stat': 78},
-            {'stat': _named('attack', ''), 'base_stat': 130},
-          ],
-          'abilities': [
-            {'ability': _named('tough-claws', ''), 'is_hidden': false},
-            {'ability': _named('blaze', ''), 'is_hidden': true},
-          ],
-        };
+          'showdown': {'front_default': null},
+        },
+      },
+      'types': [
+        {'type': _named('fire', '')},
+        {'type': _named('dragon', '')},
+      ],
+      'stats': [
+        {'stat': _named('hp', ''), 'base_stat': 78},
+        {'stat': _named('attack', ''), 'base_stat': 130},
+      ],
+      'abilities': [
+        {'ability': _named('tough-claws', ''), 'is_hidden': false},
+        {'ability': _named('blaze', ''), 'is_hidden': true},
+      ],
+    };
 
-    test('reads species id, sprites, cries and hidden abilities', () {
-      final detail = PokemonDetail.fromJson(
-        json(cries: {'latest': 'latest.ogg', 'legacy': 'legacy.ogg'}),
-      );
+    test('reads species id, sprites and hidden abilities', () {
+      final detail = PokemonDetail.fromJson(json());
 
       expect(detail.speciesId, 6);
       expect(detail.isBaseSpecies, isFalse);
       expect(detail.imageUrl, pokemonArtworkUrl(10034));
       expect(detail.animatedSpriteUrl, isNull);
-      expect(detail.cryUrl, 'latest.ogg');
       expect(detail.heightM, 1.7);
       expect(detail.weightKg, 110.5);
       expect(detail.baseStatTotal, 208);
       expect(detail.abilities.where((a) => a.isHidden).single.name, 'blaze');
     });
 
-    test('falls back to the legacy cry and to no artwork', () {
-      final detail = PokemonDetail.fromJson(
-        json(cries: {'latest': null, 'legacy': 'legacy.ogg'}, art: false),
-      );
+    test('falls back to no artwork', () {
+      final detail = PokemonDetail.fromJson(json(art: false));
 
-      expect(detail.cryUrl, 'legacy.ogg');
       expect(detail.imageUrl, isNull);
     });
 

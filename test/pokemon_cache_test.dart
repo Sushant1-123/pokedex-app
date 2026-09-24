@@ -217,7 +217,6 @@ void main() {
       );
       final (detail, _) = await repository.getPokemonDetail(1);
       expect(detail.types, ['grass']);
-      expect(detail.cryUrl, 'https://raw.githubusercontent.com/cries/1.ogg');
     });
 
     test('summaries are built from the detail cache', () async {
@@ -264,7 +263,6 @@ MockClientHandler _pokeApi(List<Uri> requests) {
         'height': 7,
         'weight': 69,
         'species': resource('pokemon-species', 'bulbasaur', 1),
-        'cries': {'latest': 'https://raw.githubusercontent.com/cries/1.ogg'},
         'types': [
           {'type': resource('type', 'grass', 12)},
         ],

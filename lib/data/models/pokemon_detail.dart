@@ -26,8 +26,6 @@ class PokemonDetail {
   /// Animated Showdown sprite (GIF), when PokeAPI has one.
   final String? animatedSpriteUrl;
 
-  /// `cries.latest`, falling back to `cries.legacy`.
-  final String? cryUrl;
   final List<String> types;
   final List<PokemonStat> stats;
   final List<PokemonAbility> abilities;
@@ -46,7 +44,6 @@ class PokemonDetail {
     required this.heightM,
     required this.weightKg,
     this.animatedSpriteUrl,
-    this.cryUrl,
     this.baseExperience,
   });
 
@@ -59,7 +56,6 @@ class PokemonDetail {
     final other = sprites['other'] as Map<String, dynamic>? ?? const {};
     String? sprite(String key) =>
         (other[key] as Map<String, dynamic>?)?['front_default'] as String?;
-    final cries = json['cries'] as Map<String, dynamic>? ?? const {};
     final species = json['species'] as Map<String, dynamic>?;
 
     // PokeAPI returns height in decimeters and weight in hectograms.
@@ -71,7 +67,6 @@ class PokemonDetail {
           : idFromResourceUrl(species['url'] as String),
       imageUrl: sprite('official-artwork'),
       animatedSpriteUrl: sprite('showdown'),
-      cryUrl: (cries['latest'] ?? cries['legacy']) as String?,
       types: [
         for (final t in json['types'] as List<dynamic>? ?? const [])
           ((t as Map<String, dynamic>)['type'] as Map<String, dynamic>)['name']
@@ -104,7 +99,6 @@ class PokemonDetail {
       speciesId: json['speciesId'] as int,
       imageUrl: json['imageUrl'] as String?,
       animatedSpriteUrl: json['animatedSpriteUrl'] as String?,
-      cryUrl: json['cryUrl'] as String?,
       types: (json['types'] as List<dynamic>).cast<String>(),
       stats: [
         for (final s in json['stats'] as List<dynamic>)
@@ -134,7 +128,6 @@ class PokemonDetail {
     'speciesId': speciesId,
     'imageUrl': imageUrl,
     'animatedSpriteUrl': animatedSpriteUrl,
-    'cryUrl': cryUrl,
     'types': types,
     'stats': stats.map((s) => s.toCacheJson()).toList(),
     'abilities': abilities.map((a) => a.toCacheJson()).toList(),

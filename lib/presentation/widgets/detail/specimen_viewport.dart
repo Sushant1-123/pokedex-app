@@ -2,8 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../core/design_tokens.dart';
-import '../../providers/core_providers.dart';
 import '../../providers/pokemon_detail_provider.dart';
 import '../grid_background.dart';
 import '../panel.dart';
@@ -16,15 +16,13 @@ import 'specimen_choreography.dart';
 /// After the Hero flight from the card lands, the Pokemon dashes in from the
 /// left with a glowing trail, jumps and lands with squash and stretch and a
 /// floor ring, lunges into a kick with an impact flash, then floats with a
-/// matching floor shadow. Taps alternate a jump and a kick and play its
-/// cry. Everything glows in the Pokemon's own colour ([glow]). With "reduce
+/// matching floor shadow. Taps alternate a jump and a kick. Everything glows in the Pokemon's own colour ([glow]). With "reduce
 /// motion" on, all of that becomes a single fade.
 class SpecimenViewport extends ConsumerStatefulWidget {
   final int pokemonId;
   final String? heroTag;
   final String? imageUrl;
   final String? animatedSpriteUrl;
-  final String? cryUrl;
   final Color glow;
 
   const SpecimenViewport({
@@ -34,7 +32,6 @@ class SpecimenViewport extends ConsumerStatefulWidget {
     required this.imageUrl,
     required this.glow,
     this.animatedSpriteUrl,
-    this.cryUrl,
   });
 
   static const floatPeriod = Duration(milliseconds: 2600);
@@ -103,8 +100,6 @@ class _SpecimenViewportState extends ConsumerState<SpecimenViewport>
   }
 
   void _onTap() {
-    final cry = widget.cryUrl;
-    if (cry != null) ref.read(cryPlayerProvider).play(cry);
     if (_reducedMotion || _entrance.isAnimating) return;
     _currentMove = _moves.take();
     _move
@@ -239,7 +234,7 @@ class _SpecimenViewportState extends ConsumerState<SpecimenViewport>
                             child: posed(
                               Semantics(
                                 button: true,
-                                label: 'Play cry',
+                                label: 'Play move',
                                 child: GestureDetector(
                                   onTap: _onTap,
                                   child: heroTag == null
@@ -268,11 +263,6 @@ class _SpecimenViewportState extends ConsumerState<SpecimenViewport>
                             ),
                           const Positioned.fill(
                             child: IgnorePointer(child: _CornerBrackets()),
-                          ),
-                          Positioned(
-                            right: AppSpacing.xxxl,
-                            bottom: AppSpacing.lg,
-                            child: _CryHint(available: widget.cryUrl != null),
                           ),
                         ],
                       );
@@ -488,27 +478,6 @@ class _AnimatedToggle extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Small "tap for cry" hint in the viewport corner.
-class _CryHint extends StatelessWidget {
-  final bool available;
-  const _CryHint({required this.available});
-
-  @override
-  Widget build(BuildContext context) {
-    if (!available) return const SizedBox.shrink();
-    return const IgnorePointer(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.volume_up_rounded, size: 14, color: AppColors.textMuted),
-          SizedBox(width: AppSpacing.xs),
-          Text('TAP · CRY', style: AppTypography.caption),
-        ],
       ),
     );
   }
