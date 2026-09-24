@@ -10,16 +10,21 @@ import 'status_readouts.dart';
 /// App chrome: a header with the Poke Ball logo, then the navigation for
 /// the screen size — the Stitch sidebar on desktop, a rail on tablet, and a
 /// bottom bar with a "More" sheet on mobile.
+///
+/// [bottomBar] (e.g. the phone pager) is pinned under the content, above
+/// the mobile navigation bar and inside the safe area.
 class FieldShell extends ConsumerWidget {
   final AppDestination active;
   final Widget child;
   final VoidCallback? onRefresh;
+  final Widget? bottomBar;
 
   const FieldShell({
     super.key,
     required this.active,
     required this.child,
     this.onRefresh,
+    this.bottomBar,
   });
 
   @override
@@ -42,6 +47,7 @@ class FieldShell extends ConsumerWidget {
                 ],
               ),
             ),
+            ?bottomBar,
             if (!isDesktop && !isTablet) _BottomNav(active: active),
           ],
         ),

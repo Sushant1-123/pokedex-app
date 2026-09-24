@@ -226,4 +226,18 @@ class AppSizes {
 
   /// Compare Lab radar chart.
   static const double radarChart = 260;
+
+  /// Minimum touch target for phone controls.
+  static const double tapTarget = 44;
+
+  /// Numbered pager buttons, their icons, and the room one Prev/Next
+  /// button needs when deciding how many page numbers fit.
+  static const double pagerButton = 36;
+  static const double pagerIcon = 18;
+  static const double pagerNavWidth = 84;
+
+  /// Page-jump sheet: columns of page numbers and its maximum height as a
+  /// fraction of the screen.
+  static const int pageJumpColumns = 5;
+  static const double sheetHeight = .6;
 }

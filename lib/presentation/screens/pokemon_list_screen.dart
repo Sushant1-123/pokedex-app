@@ -65,11 +65,24 @@ class _PokemonListScreenState extends ConsumerState<PokemonListScreen> {
     final status = state.status;
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= Breakpoints.tablet;
+    final isPhone = width < Breakpoints.phone;
     final padding = Breakpoints.pagePaddingFor(width);
+    // Hidden while the keyboard is up so search keeps its room.
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     return FieldShell(
       active: AppDestination.specimenIndex,
       onRefresh: notifier.refresh,
+      bottomBar: switch (status) {
+        ListPaged(:final page, :final pageCount)
+            when isPhone && pageCount > 1 && !keyboardOpen =>
+          _PhonePagerBar(
+            page: page,
+            pageCount: pageCount,
+            onPage: notifier.goToPage,
+          ),
+        _ => null,
+      },
       child: CallbackShortcuts(
         bindings: {
           SingleActivator(
@@ -167,7 +180,7 @@ class _PokemonListScreenState extends ConsumerState<PokemonListScreen> {
                           page: page,
                           pageCount: pageCount,
                           totalCount: totalCount,
-                          compact: !isWide,
+                          showPager: !isPhone,
                           stacked: width < Breakpoints.desktop,
                           state: state,
                           onPage: notifier.goToPage,
@@ -401,12 +414,43 @@ class _TypeChip extends StatelessWidget {
   );
 }
 
-/// "Showing 1 – 30 of 1,025" + the pager + the latency readout.
+/// Phone pager pinned above the bottom navigation.
+class _PhonePagerBar extends StatelessWidget {
+  final int page;
+  final int pageCount;
+  final ValueChanged<int> onPage;
+
+  const _PhonePagerBar({
+    required this.page,
+    required this.pageCount,
+    required this.onPage,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpacing.md,
+      vertical: AppSpacing.sm,
+    ),
+    decoration: const BoxDecoration(
+      color: AppColors.surfaceSunken,
+      border: Border(top: BorderSide(color: AppColors.border)),
+    ),
+    child: MobilePaginationBar(
+      page: page,
+      pageCount: pageCount,
+      onPage: onPage,
+    ),
+  );
+}
+
+/// "Showing 1 – 30 of 1,025" + the pager + the latency readout. On phones
+/// the pager lives in [_PhonePagerBar] instead ([showPager] is false).
 class _PagerPanel extends StatelessWidget {
   final int page;
   final int pageCount;
   final int totalCount;
-  final bool compact;
+  final bool showPager;
   final bool stacked;
   final PokemonListState state;
   final ValueChanged<int> onPage;
@@ -415,7 +459,7 @@ class _PagerPanel extends StatelessWidget {
     required this.page,
     required this.pageCount,
     required this.totalCount,
-    required this.compact,
+    required this.showPager,
     required this.stacked,
     required this.state,
     required this.onPage,
@@ -433,15 +477,16 @@ class _PagerPanel extends StatelessWidget {
       page: page,
       pageCount: pageCount,
       onPage: onPage,
-      compact: compact,
     );
     return Panel(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: stacked
           ? Column(
               children: [
-                pager,
-                const SizedBox(height: AppSpacing.md),
+                if (showPager) ...[
+                  pager,
+                  const SizedBox(height: AppSpacing.md),
+                ],
                 summary,
                 const SizedBox(height: AppSpacing.xs),
                 LatencyReadout(source: state.lastSource),

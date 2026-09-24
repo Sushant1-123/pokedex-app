@@ -266,7 +266,6 @@ class PokemonPageGrid extends StatelessWidget {
                   page: data.page,
                   pageCount: data.pageCount,
                   onPage: onPage,
-                  compact: width < Breakpoints.tablet,
                 ),
               ],
             ],

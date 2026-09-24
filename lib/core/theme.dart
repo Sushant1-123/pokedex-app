@@ -79,6 +79,9 @@ class AppTheme {
 /// desktop (5-col + sidebar) Stitch frames.
 class Breakpoints {
   Breakpoints._();
+
+  /// Below this the pager becomes the compact phone bar.
+  static const double phone = 600;
   static const double tablet = 700;
   static const double desktop = 1200;
 
