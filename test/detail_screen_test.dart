@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -141,6 +142,33 @@ void main() {
       expect((tester.getCenter(artwork()) - before).distance, greaterThan(8));
       expect(find.textContaining('CRY'), findsNothing);
       await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('hovering the artwork leans it toward the cursor', (
+      tester,
+    ) async {
+      await settled(tester);
+      final art = tester.getRect(artwork());
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+
+      await mouse.moveTo(art.centerRight - const Offset(8, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      final leaning = tester.getCenter(artwork());
+
+      await mouse.moveTo(Offset.zero);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(leaning.dx, greaterThan(tester.getCenter(artwork()).dx));
+    });
+
+    test('the hover side comes from the cursor position', () {
+      const art = Rect.fromLTWH(0, 0, 100, 100);
+      expect(hoverSide(const Offset(20, 50), art), -1);
+      expect(hoverSide(const Offset(80, 50), art), 1);
+      expect(hoverSide(const Offset(120, 50), art), isNull);
     });
   });
 

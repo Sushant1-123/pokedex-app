@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../../core/design_tokens.dart';
 import '../../providers/pokemon_detail_provider.dart';
 import '../grid_background.dart';
@@ -16,8 +15,10 @@ import 'specimen_choreography.dart';
 /// After the Hero flight from the card lands, the Pokemon dashes in from the
 /// left with a glowing trail, jumps and lands with squash and stretch and a
 /// floor ring, lunges into a kick with an impact flash, then floats with a
-/// matching floor shadow. Taps alternate a jump and a kick. Everything glows in the Pokemon's own colour ([glow]). With "reduce
-/// motion" on, all of that becomes a single fade.
+/// matching floor shadow. Taps alternate a jump and a kick. With a mouse,
+/// hovering the artwork makes it lean toward the cursor and hop once while
+/// it keeps floating. Everything glows in the Pokemon's own colour
+/// ([glow]). With "reduce motion" on, all of that becomes a single fade.
 class SpecimenViewport extends ConsumerStatefulWidget {
   final int pokemonId;
   final String? heroTag;
@@ -52,6 +53,16 @@ class _SpecimenViewportState extends ConsumerState<SpecimenViewport>
     duration: SpecimenViewport.floatPeriod,
   );
   late final AnimationController _move = AnimationController(vsync: this);
+
+  /// -1 (leaning left) .. 1 (leaning right) toward the hovering cursor.
+  late final AnimationController _lean = AnimationController.unbounded(
+    vsync: this,
+  );
+  late final AnimationController _hoverJump = AnimationController(
+    vsync: this,
+    duration: AppMotion.viewportHoverJump,
+  );
+  double? _hoverSide;
   final _moves = TapMoves();
   SpecimenMove _currentMove = SpecimenMove.jump;
 
@@ -96,7 +107,27 @@ class _SpecimenViewportState extends ConsumerState<SpecimenViewport>
     _entrance.dispose();
     _float.dispose();
     _move.dispose();
+    _lean.dispose();
+    _hoverJump.dispose();
     super.dispose();
+  }
+
+  /// Tracks the cursor over the viewport; [art] is the artwork's resting
+  /// box, so the reaction doesn't flicker while the Pokemon moves.
+  void _onPointer(Offset? position, Rect art) {
+    final side = position == null ? null : hoverSide(position, art);
+    if (side == _hoverSide) return;
+    final entered = _hoverSide == null;
+    _hoverSide = side;
+    if (_reducedMotion) return;
+    _lean.animateTo(
+      side ?? 0,
+      duration: AppMotion.viewportLeanDuration,
+      curve: Curves.easeOutCubic,
+    );
+    if (entered && side != null && _entrance.isCompleted) {
+      _hoverJump.forward(from: 0);
+    }
   }
 
   void _onTap() {
@@ -164,109 +195,131 @@ class _SpecimenViewportState extends ConsumerState<SpecimenViewport>
                   final size = constraints.biggest;
                   final artSize = size.shortestSide * .66;
                   final floorY = size.height / 2 + artSize * .44;
-                  return AnimatedBuilder(
-                    animation: Listenable.merge([_entrance, _float, _move]),
-                    builder: (context, _) {
-                      final frame = _frame;
-                      final bob = _reducedMotion
-                          ? 0.0
-                          : math.sin(_float.value * 2 * math.pi) * .035;
-                      Widget posed(Widget child) => Transform.translate(
-                        offset: Offset(
-                          frame.dx * artSize,
-                          (frame.dy - bob) * artSize,
-                        ),
-                        child: Transform(
-                          alignment: Alignment.bottomCenter,
-                          transform: Matrix4.identity()
-                            ..rotateZ(frame.angle)
-                            ..scaleByDouble(frame.scaleX, frame.scaleY, 1, 1),
-                          child: SizedBox.square(
-                            dimension: artSize,
-                            child: child,
+                  final artRect = Rect.fromCenter(
+                    center: size.center(Offset.zero),
+                    width: artSize,
+                    height: artSize,
+                  );
+                  return MouseRegion(
+                    onHover: (event) =>
+                        _onPointer(event.localPosition, artRect),
+                    onExit: (_) => _onPointer(null, artRect),
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _entrance,
+                        _float,
+                        _move,
+                        _lean,
+                        _hoverJump,
+                      ]),
+                      builder: (context, _) {
+                        final frame = _frame;
+                        final bob = _reducedMotion
+                            ? 0.0
+                            : math.sin(_float.value * 2 * math.pi) * .035 +
+                                  math.sin(_hoverJump.value * math.pi) *
+                                      AppMotion.viewportHoverHop;
+                        final lean = _reducedMotion ? 0.0 : _lean.value;
+                        Widget posed(Widget child) => Transform.translate(
+                          offset: Offset(
+                            (frame.dx + lean * AppMotion.viewportLeanShift) *
+                                artSize,
+                            (frame.dy - bob) * artSize,
                           ),
-                        ),
-                      );
-                      return Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Positioned.fill(
-                            child: _ViewportBackdrop(
-                              glow: glow,
-                              label: dexNumber(widget.pokemonId),
+                          child: Transform(
+                            alignment: Alignment.bottomCenter,
+                            transform: Matrix4.identity()
+                              ..rotateZ(
+                                frame.angle + lean * AppMotion.viewportLean,
+                              )
+                              ..scaleByDouble(frame.scaleX, frame.scaleY, 1, 1),
+                            child: SizedBox.square(
+                              dimension: artSize,
+                              child: child,
                             ),
                           ),
-                          Positioned.fill(
-                            child: CustomPaint(
-                              painter: _FloorFxPainter(
+                        );
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Positioned.fill(
+                              child: _ViewportBackdrop(
                                 glow: glow,
-                                floorY: floorY,
-                                width: artSize,
-                                lift: -frame.dy + bob,
-                                ring: frame.ring,
+                                label: dexNumber(widget.pokemonId),
                               ),
                             ),
-                          ),
-                          if (frame.trail > 0)
-                            for (var k = 3; k >= 1; k--)
-                              IgnorePointer(
-                                child: Transform.translate(
-                                  offset: Offset(-k * artSize * .14, 0),
-                                  child: Opacity(
-                                    opacity: (frame.trail * .45 / k).clamp(
-                                      0.0,
-                                      1.0,
-                                    ),
-                                    child: posed(
-                                      ColorFiltered(
-                                        colorFilter: ColorFilter.mode(
-                                          glow,
-                                          BlendMode.srcIn,
+                            Positioned.fill(
+                              child: CustomPaint(
+                                painter: _FloorFxPainter(
+                                  glow: glow,
+                                  floorY: floorY,
+                                  width: artSize,
+                                  lift: -frame.dy + bob,
+                                  ring: frame.ring,
+                                ),
+                              ),
+                            ),
+                            if (frame.trail > 0)
+                              for (var k = 3; k >= 1; k--)
+                                IgnorePointer(
+                                  child: Transform.translate(
+                                    offset: Offset(-k * artSize * .14, 0),
+                                    child: Opacity(
+                                      opacity: (frame.trail * .45 / k).clamp(
+                                        0.0,
+                                        1.0,
+                                      ),
+                                      child: posed(
+                                        ColorFiltered(
+                                          colorFilter: ColorFilter.mode(
+                                            glow,
+                                            BlendMode.srcIn,
+                                          ),
+                                          child: image,
                                         ),
-                                        child: image,
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                          Opacity(
-                            opacity: _reducedMotion ? _entrance.value : 1,
-                            child: posed(
-                              Semantics(
-                                button: true,
-                                label: 'Play move',
-                                child: GestureDetector(
-                                  onTap: _onTap,
-                                  child: heroTag == null
-                                      ? image
-                                      : Hero(tag: heroTag, child: image),
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (frame.flash > 0)
-                            Positioned.fill(
-                              child: IgnorePointer(
-                                child: CustomPaint(
-                                  painter: _ImpactFlashPainter(
-                                    glow: glow,
-                                    strength: frame.flash,
-                                    center: Offset(
-                                      size.width / 2 +
-                                          (frame.dx + .42) * artSize,
-                                      size.height / 2,
-                                    ),
-                                    radius: artSize * .35,
+                            Opacity(
+                              opacity: _reducedMotion ? _entrance.value : 1,
+                              child: posed(
+                                Semantics(
+                                  button: true,
+                                  label: 'Play move',
+                                  child: GestureDetector(
+                                    onTap: _onTap,
+                                    child: heroTag == null
+                                        ? image
+                                        : Hero(tag: heroTag, child: image),
                                   ),
                                 ),
                               ),
                             ),
-                          const Positioned.fill(
-                            child: IgnorePointer(child: _CornerBrackets()),
-                          ),
-                        ],
-                      );
-                    },
+                            if (frame.flash > 0)
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: CustomPaint(
+                                    painter: _ImpactFlashPainter(
+                                      glow: glow,
+                                      strength: frame.flash,
+                                      center: Offset(
+                                        size.width / 2 +
+                                            (frame.dx + .42) * artSize,
+                                        size.height / 2,
+                                      ),
+                                      radius: artSize * .35,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            const Positioned.fill(
+                              child: IgnorePointer(child: _CornerBrackets()),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   );
                 },
               ),
@@ -276,6 +329,13 @@ class _SpecimenViewportState extends ConsumerState<SpecimenViewport>
       ),
     );
   }
+}
+
+/// Which side of [art] the cursor at [position] is on: -1 left, 1 right,
+/// or null when it is outside the artwork.
+double? hoverSide(Offset position, Rect art) {
+  if (!art.contains(position)) return null;
+  return position.dx < art.center.dx ? -1 : 1;
 }
 
 /// Radial glow in the Pokemon's colour with a large faded dex number

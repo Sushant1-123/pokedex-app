@@ -209,6 +209,14 @@ class AppMotion {
 
   /// How far artwork pops out above the top of its container.
   static const double artworkOverlap = 14;
+
+  /// Detail viewport hover: lean (radians) and sideways shift toward the
+  /// cursor, and one small hop, as fractions of the artwork size.
+  static const double viewportLean = .07;
+  static const double viewportLeanShift = .03;
+  static const double viewportHoverHop = .06;
+  static const Duration viewportLeanDuration = Duration(milliseconds: 240);
+  static const Duration viewportHoverJump = Duration(milliseconds: 380);
 }
 
 /// Base-stat colour bands: low stats are muted, mid stats cyan, high
